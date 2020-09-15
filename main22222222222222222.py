@@ -70,7 +70,7 @@ for i in range(5):
                  ,activation='softmax',loss='binary_crossentropy')
     model=addWeightTo3DModel(model, keras.losses.categorical_crossentropy,lr=lr)
 
-    model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
+    #model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
     l=model.fit_generator(myGen,steps_per_epoch=20000,epochs=1)
 
 

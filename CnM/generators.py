@@ -391,6 +391,9 @@ class dataGen(object):
         weights = 1 * ((labels[...,0] +  labels[...,1] + labels[...,2]) == 1)*(labels[...,0]*self.class_weights[0]+
                                                                                labels[...,1]*self.class_weights[1] + labels[...,2]*self.class_weights[2])
 
+        remake=np.zeros(labels.shape[0:-1])
+        remake=labels[...,1]
+        labels=remake[...,np.newaxis]
 
         #weights=weights*self.ph was moved to trasngen
         return {'input_data': image, 'input_weight': weights[...,np.newaxis]}, labels
