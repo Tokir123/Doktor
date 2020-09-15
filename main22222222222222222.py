@@ -17,6 +17,10 @@ import time
 
 #K.set_floatx('float32')
 
+
+os.chdir("..") #Moves up one level
+print(os.getcwd())
+
 ####Import
 lr=(1e-3)
 for i in range(5):
