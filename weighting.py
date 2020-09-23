@@ -1,57 +1,51 @@
 import cv2
+from PIL import Image
+import os
+import numpy as np
+os.chdir("..") #Moves up one level
 
-cv2.connectedComponents()
-
+labels = np.array(Image.open('Unet3D/images/training/source/rotated/labels/7.png'))
+cv2.connectedComponents(labels)
 #Import Bild als image
 #
-#
+#D:\PycharmProjects\Unet3D\images\training\source\rotated\labels
 #
 
-ret,mask=cv2.connectedComponents(image,connectivity=8)
+ret,mask=cv2.connectedComponents(labels,connectivity=8)
+mask=mask-1
+ret=ret-1
 
-def labelling_neighbours(classification,pixel):
+def max_neighbours(image,pixel):
     class_indication=0
 
-    if  not(min(pixel)<1|pixel[0]>classification.shape[0]-1|pixel[1]>classification.shape[1]-1):
-        class_indication=np.max
+    if  not(min(pixel)<1|pixel[0]>image.shape[0]-1|pixel[1]>image.shape[1]-1):
+        class_indication=np.max(image[pixel[0]-1:pixel[0]+1,pixel[1]-1:pixel[1]+1])
+
     return class_indication
 
 
 
-class_iterator=1
-classification=np.zeros(image.shape)
-
-for pixel in image:
-    if (image[pixel]==1):
-
-        if(labelling_neighbours==0):
-            classification[pixel]=class_iterator
-            class_iterator=class_iterator+1
-        else:
-            classification[pixel] = labelling_neighbours
 
 
+weighting_all=np.zeros(image.shape+(ret,))
 
+for i in range(ret):
+    weighting_all[...,i]=(mask==i)
 
-
-weighting_all=np.zeros(image.shape+(length(np.unique(classification))-1))
-
-for i in range(np.unique(classification))-1):
-    weighting_all[...,i]=(classification==i)
-
-for iteration in range[30]:
-    for i in range(np.unique(classification))-1):
-        if (weighting_all[pixel,i]==0):
-            if(max_neighbor(weighting_all[, i], pixel)>0):
-                weighting_all[pixel, i] = max_neighbor(weighting_all[, i], pixel)+1
+for iteration in range(30):
+    for i in range(ret):
+        for pixel in np.ndindex(weighting_all[...,i]).shape)
+            if (weighting_all[pixel,i]==0):
+                if(max_neighbours(weighting_all[...,i], pixel)>0):
+                    weighting_all[pixel, i] = max_neighbor(weighting_all[..., i], pixel)+1
 
 weighting_all[weighting_all==0]=40
 weighting_all=weighting_all-1
 
-weighting=np.zeros(image.shape)
+weighting=np.zeros(labels.shape)
 
-for pixel in image:
-    if(image[pixel==0]):\
+for pixel in np.ndindex(labels.shape):
+    if(labels[pixel]==0):
         weighting[pixel]=weight_function(np.unique(weighting_all[pixel,])[0],np.unique(weighting_all[pixel,])[1])
 weighting=weighting+1
 
