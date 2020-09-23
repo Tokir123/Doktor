@@ -1,10 +1,19 @@
+import cv2
+
+cv2.connectedComponents()
+
 #Import Bild als image
 #
 #
 #
 
-def labelling_neighbours(classification,pixel):
+ret,mask=cv2.connectedComponents(image,connectivity=8)
 
+def labelling_neighbours(classification,pixel):
+    class_indication=0
+
+    if  not(min(pixel)<1|pixel[0]>classification.shape[0]-1|pixel[1]>classification.shape[1]-1):
+        class_indication=np.max
     return class_indication
 
 
@@ -45,3 +54,4 @@ for pixel in image:
     if(image[pixel==0]):\
         weighting[pixel]=weight_function(np.unique(weighting_all[pixel,])[0],np.unique(weighting_all[pixel,])[1])
 weighting=weighting+1
+
