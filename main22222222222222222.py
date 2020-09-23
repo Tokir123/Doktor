@@ -17,17 +17,15 @@ import time
 
 #K.set_floatx('float32')
 
-
-os.chdir("..") #Moves up one level
-print(os.getcwd())
-
 ####Import
 lr=(1e-3)
-for i in range(5):
+different_models=5
+
+for i in range(different_models):
 
 # for i in (0,):
     i=i+1
-    lr=(1e-3)/7
+    lr=(1e-3)/5
     print(i)
     if i>1:
         del model
@@ -66,11 +64,10 @@ for i in range(5):
 
     myGen=transGenerator(dataGenerator)
 
-    model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=1
-                 ,activation='softmax',loss='binary_crossentropy')
+    model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=3,activation='softmax',loss='categorical_crossentropy')
     model=addWeightTo3DModel(model, keras.losses.categorical_crossentropy,lr=lr)
 
-    #model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
+   # model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
     l=model.fit_generator(myGen,steps_per_epoch=20000,epochs=1)
 
 
@@ -104,7 +101,7 @@ for i in range(5):
     # np.savetxt(folder_name +'/'+ str(i)+'big.txt', bigg)
 
     if i==1:
-        bigstack=np.empty((4,)+bigg.shape)
+        bigstack=np.empty((different_models,)+bigg.shape)
     bigstack[i-1,...]=bigg
     img = sitk.GetImageFromArray(bigg)
     sitk.WriteImage(img, folder_name +'/'+ str(i)+'big.mha')

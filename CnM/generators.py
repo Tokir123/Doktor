@@ -355,6 +355,7 @@ def transGenerator(gen):
         X1 = rotation_3d(X1, angle_list)
         X2= rotation_3d(X2, angle_list)
         Y = rotation_3d(Y, angle_list)
+
         X2[...,0]=X2[...,0]*gen.ph
         yield {'input_data': X1, 'input_weight': X2}, Y
 
@@ -391,10 +392,10 @@ class dataGen(object):
         weights = 1 * ((labels[...,0] +  labels[...,1] + labels[...,2]) == 1)*(labels[...,0]*self.class_weights[0]+
                                                                                labels[...,1]*self.class_weights[1] + labels[...,2]*self.class_weights[2])
 
-        remake=np.zeros(labels.shape[0:-1])
-        remake=labels[...,1]
-        labels=remake[...,np.newaxis]
-
+        ######
+        labels[...,0]=labels[...,0]+labels[...,2]
+        labels[...,2]=np.zeros(labels[...,2].shape)
+        ######
         #weights=weights*self.ph was moved to trasngen
         return {'input_data': image, 'input_weight': weights[...,np.newaxis]}, labels
 
