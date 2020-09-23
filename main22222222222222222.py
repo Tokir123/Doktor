@@ -18,6 +18,9 @@ import time
 #K.set_floatx('float32')
 
 ####Import
+os.chdir("..") #Moves up one level
+print(os.getcwd())
+
 lr=(1e-3)
 different_models=5
 
