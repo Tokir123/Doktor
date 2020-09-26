@@ -6,8 +6,8 @@ import math as m
 import copy
 os.chdir("..") #Moves up one level
 
-labels = np.array(Image.open('images/training/source/rotated/labels/labelsreworked/28.png'))
-labels=labels[...,0]
+labels = np.array(Image.open('images/training/source/rotated/labels/labelsreworked/60.png'))
+#labels=labels[...,0]
 
 #Import Bild als image
 #
@@ -56,8 +56,7 @@ for iteration in range(5):
                      #weighting_all[pixel+(i,)] = min_neighbours(snapshot[..., i], pixel)+1
                      weighting_all[pixel + (i,)]=iteration+2
 
-weighting_all[weighting_all==0]=7
-weighting_all[...,1]=8
+weighting_all[weighting_all==0]=9
 weighting_all=weighting_all-1
 
 weighting=np.zeros(labels.shape)
@@ -66,7 +65,7 @@ weighting=np.zeros(labels.shape)
 
 for pixel in np.ndindex(labels.shape):
     if(labels[pixel]==0):
-        weighting[pixel]=weight_function(np.unique(weighting_all[pixel])[0],np.unique(weighting_all[pixel])[1])
+        weighting[pixel]=weight_function(np.sort(weighting_all[pixel])[0],np.sort(weighting_all[pixel])[1])
 weighting=(weighting/(np.max(weighting))*249).astype(np.uint8)
 img = Image.fromarray(weighting)
 img.show()

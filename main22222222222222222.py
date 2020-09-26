@@ -48,6 +48,7 @@ for i in range(different_models):
     image = (image - mean) / std
     dims = image.shape
     labels = MakeLabel(full_image_size=image.shape)
+    weights = MakeWeight(full_image_size=image.shape)
     size = 64
     depth = 64
     class_weights = (1, 1, 10)

@@ -38,6 +38,25 @@ def   MakeLabel(label_folder='images/training/source/rotated/labels/labels',full
 
 
     return ph
+
+def   MakeWeight(label_folder='images/training/source/rotated/labels/labels',full_image_size=(1008, 1204, 101)):
+    '''
+    :param label_folder:
+    :param full_image_size:
+    :return:
+    '''
+    file_list=os.listdir(label_folder)
+    ph=np.zeros(shape=full_image_size)
+    for i in range(len(file_list)):
+        file = file_list[i]
+        weight=np.array(Image.open(label_folder+'/'+file))
+        slice=int(file.split('.')[0])-1
+        #label=OneHotEncoding(label)
+        ph[...,slice,:]=weight
+
+
+
+    return ph
 def HotToFile(input, file='placeholder.mha'):
     factor = 250/input.shape[-1]
 
