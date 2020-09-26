@@ -361,10 +361,11 @@ def transGenerator(gen):
 
 
 class dataGen(object):
-    def __init__(self, image, labels, lower, upper, target_size=(80,80,80), batch_size=1,slice_label=50, class_weights=(0.5,2,20),padding=18):
+    def   __init__(self, image, labels, weights, lower, upper, target_size=(80,80,80), batch_size=1,slice_label=50, class_weights=(0.5,2,20),padding=18):
         self.batch_size = batch_size
         self.image = image
         self.labels = labels
+        self.weights = weights
         self.lower = lower
         self.upper = upper
         self.target_size = target_size
@@ -381,6 +382,7 @@ class dataGen(object):
         rand = 1 + (rand - 0.5)/5
         slice=randint(0,63)
         image = getCutOut(self.image, cutouts_low, cutouts_high)
+        weights=getCutOut(self.weights, cutouts_low, cutouts_high)
         mean = np.mean(image[0,slice,slice,...])
         std = np.std(image[0,slice,slice,...])
         if std==0:
@@ -389,15 +391,12 @@ class dataGen(object):
         image = (image - mean)
         image=image*rand
         labels = getCutOut(self.labels, cutouts_low, cutouts_high)
-        weights = 1 * ((labels[...,0] +  labels[...,1] + labels[...,2]) == 1)*(labels[...,0]*self.class_weights[0]+
-                                                                               labels[...,1]*self.class_weights[1] + labels[...,2]*self.class_weights[2])
+
+
 
         ######
-        labels[...,0]=labels[...,0]+labels[...,2]
-        labels[...,2]=np.zeros(labels[...,2].shape)
-        ######
         #weights=weights*self.ph was moved to trasngen
-        return {'input_data': image, 'input_weight': weights[...,np.newaxis]}, labels
+        return {'input_data': image, 'input_weight': weights}, labels
 
 def CorrectGen(gen,model):
     while True:

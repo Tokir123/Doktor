@@ -38,8 +38,8 @@ for i in range(different_models):
     #     cuda.select_device(0)
     #     cuda.close()
     #     time.sleep(15 * 60)
-    image  = sitk.ReadImage('images/training/source/rotated/image.mha')
-    labels = np.array(Image.open('images/training/source/rotated/labelsd.png'))
+    image  = sitk.ReadImage('training_data/image/image.mha')
+
     ####Import Done
 
     image = np.moveaxis(sitk.GetArrayFromImage(image), 0, -1)
@@ -64,15 +64,15 @@ for i in range(different_models):
     downscale_factor = 2**i
     batch_size = 4#*downscale_factor
 
-    dataGenerator=dataGen(image, labels, lower=min, upper=max, target_size=target_size, batch_size=batch_size, slice_label=50,class_weights=class_weights)
+    dataGenerator=dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=batch_size, slice_label=50,class_weights=class_weights)
 
     myGen=transGenerator(dataGenerator)
 
-    model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=3,activation='softmax',loss='categorical_crossentropy')
+    model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=2 ,activation='softmax',loss='categorical_crossentropy')
     model=addWeightTo3DModel(model, keras.losses.categorical_crossentropy,lr=lr)
 
    # model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
-    l=model.fit_generator(myGen,steps_per_epoch=20000,epochs=1)
+    l=model.fit_generator(myGen,steps_per_epoch=2000,epochs=1)
 
 
     model.save_weights(folder_name+'/my_model_weights'+str(i)+'.h5')

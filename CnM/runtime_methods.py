@@ -20,39 +20,43 @@ def   MakeLabel(label,full_image_size=(1008, 1204, 101), label_slices=50):
     new_labels[:, :, label_slices, :] = onehot
     return new_labels
 '''
-def   MakeLabel(label_folder='images/training/source/rotated/labels/labels',full_image_size=(1008, 1204, 101)):
+def   MakeLabel(label_folder='training_data/labels',full_image_size=(1008, 1204, 101)):
     '''
     :param label_folder:
     :param full_image_size:
     :return:
     '''
     file_list=os.listdir(label_folder)
-    ph=np.zeros(shape=full_image_size+(3,))+4
+    ph=np.zeros(shape=full_image_size+(2,))+4
     for i in range(len(file_list)):
         file = file_list[i]
         label=np.array(Image.open(label_folder+'/'+file))
+        if len(label.shape)==3:
+            label=label[...,0]
+        print(label.shape)
         slice=int(file.split('.')[0])-1
         label=OneHotEncoding(label)
+        print(label.shape)
         ph[...,slice,:]=label
 
 
 
     return ph
 
-def   MakeWeight(label_folder='images/training/source/rotated/labels/labels',full_image_size=(1008, 1204, 101)):
+def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 1204, 101)):
     '''
     :param label_folder:
     :param full_image_size:
     :return:
     '''
     file_list=os.listdir(label_folder)
-    ph=np.zeros(shape=full_image_size)
+    ph=np.zeros(shape=full_image_size+(1,))
     for i in range(len(file_list)):
         file = file_list[i]
         weight=np.array(Image.open(label_folder+'/'+file))
         slice=int(file.split('.')[0])-1
         #label=OneHotEncoding(label)
-        ph[...,slice,:]=weight
+        ph[...,slice,0]=weight/45
 
 
 
