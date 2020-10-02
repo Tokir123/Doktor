@@ -6,7 +6,7 @@ import math as m
 import copy
 os.chdir("..") #Moves up one level
 
-labels = np.array(Image.open('training_data/labels/28.png'))
+labels = np.array(Image.open('training_data/labels/65.png'))
 labels=labels[...,0]
 
 #Import Bild als image
@@ -56,7 +56,7 @@ for iteration in range(5):
                      #weighting_all[pixel+(i,)] = min_neighbours(snapshot[..., i], pixel)+1
                      weighting_all[pixel + (i,)]=iteration+2
 
-weighting_all[weighting_all==0]=9
+weighting_all[(weighting_all==0)]=50
 weighting_all=weighting_all-1
 
 weighting=np.zeros(labels.shape)

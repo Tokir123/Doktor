@@ -18,7 +18,7 @@ def unet3D(pretrained_weights=None, input_size=(256, 256, 256, 1), kernelSize=3,
     """
     d=downscale_factor
     inputs = Input(input_size, name='input_data')
-    inputs=BatchNormalization(axis=-1)(inputs) #really?
+    #batch1=BatchNormalization(axis=-1)(inputs) #really?
     conv1 = Conv3D(64//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
     batch1=BatchNormalization(axis=-1)(conv1)
     conv1 = Conv3D(64//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch1)
@@ -28,41 +28,54 @@ def unet3D(pretrained_weights=None, input_size=(256, 256, 256, 1), kernelSize=3,
     batch2 = BatchNormalization(axis=-1)(conv2)
     conv2 = Conv3D(128//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch2)
     pool2 = MaxPooling3D(pool_size=(2, 2, 2))(conv2)
-    conv3 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
-    conv3 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
+    batch3 = BatchNormalization(axis=-1)(pool2)
+    conv3 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch3)
+    batch3 = BatchNormalization(axis=-1)(conv3)
+    conv3 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch3)
     pool3 = MaxPooling3D(pool_size=(2, 2, 2))(conv3)
-    conv4 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
-    conv4 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
+    batch4 = BatchNormalization(axis=-1)(pool3)
+    conv4 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch4)
+    batch4 = BatchNormalization(axis=-1)(conv4)
+    conv4 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch4)
     drop4 = Dropout(0.5)(conv4)
     pool4 = MaxPooling3D(pool_size=(2, 2, 2))(drop4)
-
-    conv5 = Conv3D(1024//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
-    conv5 = Conv3D(1024//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
+    batch5 = BatchNormalization(axis=-1)(pool4)
+    conv5 = Conv3D(1024//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch5)
+    batch5 = BatchNormalization(axis=-1)(conv5)
+    conv5 = Conv3D(1024//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch5)
     drop5 = Dropout(0.5)(conv5)
 
     up6 = Conv3D(512//d, 2, activation='relu', padding='same', kernel_initializer='he_normal')(
         UpSampling3D(size=(2, 2, 2))(drop5))
     merge6 = Concatenate(axis=4)([drop4, up6])
-    conv6 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
-    conv6 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(conv6)
+    batch6 = BatchNormalization(axis=-1)(merge6)
+    conv6 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch6)
+    batch6 = BatchNormalization(axis=-1)(conv6)
+    conv6 = Conv3D(512//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch6)
 
     up7 = Conv3D(256//d, 2, activation='relu', padding='same', kernel_initializer='he_normal')(
         UpSampling3D(size=(2, 2, 2))(conv6))
     merge7 = Concatenate(axis=4)([conv3, up7])
-    conv7 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
-    conv7 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(conv7)
+    batch7 = BatchNormalization(axis=-1)(merge7)
+    conv7 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch7)
+    batch7 = BatchNormalization(axis=-1)(conv7)
+    conv7 = Conv3D(256//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch7)
 
     up8 = Conv3D(128//d, 2, activation='relu', padding='same', kernel_initializer='he_normal')(
         UpSampling3D(size=(2, 2, 2))(conv7))
     merge8 = Concatenate(axis=4)([conv2, up8])
-    conv8 = Conv3D(128//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
-    conv8 = Conv3D(128//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(conv8)
+    batch8 = BatchNormalization(axis=-1)(merge8)
+    conv8 = Conv3D(128//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch8)
+    batch8 = BatchNormalization(axis=-1)(conv8)
+    conv8 = Conv3D(128//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch8)
 
     up9 = Conv3D(64//d, 2, activation='relu', padding='same', kernel_initializer='he_normal')(
         UpSampling3D(size=(2, 2, 2))(conv8))
     merge9 = Concatenate(axis=4)([conv1, up9])
-    conv9 = Conv3D(64//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
-    conv9 = Conv3D(64//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(conv9)
+    batch9 = BatchNormalization(axis=-1)(merge9)
+    conv9 = Conv3D(64//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch9)
+    batch9 = BatchNormalization(axis=-1)(conv9)
+    conv9 = Conv3D(64//d, kernelSize, activation='relu', padding='same', kernel_initializer='he_normal')(batch9)
 
     conv10 = Conv3D(outputSize, 1, activation=activation)(conv9)
 

@@ -57,7 +57,7 @@ def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 120
         slice=int(file.split('.')[0])-1
         weight=weight/46
         print(np.unique(weight))
-        weight=weight*weight+0.1
+        weight=weight*weight*weight+0.1
 
         ph[...,slice,0]=weight
 
