@@ -6,8 +6,8 @@ import math as m
 import copy
 os.chdir("..") #Moves up one level
 
-labels = np.array(Image.open('images/training/source/rotated/labels/labelsreworked/60.png'))
-#labels=labels[...,0]
+labels = np.array(Image.open('training_data/labels/28.png'))
+labels=labels[...,0]
 
 #Import Bild als image
 #

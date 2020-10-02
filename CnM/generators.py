@@ -21,7 +21,7 @@ class BoxGenerator3D:
 
     def includeSlice(self, sliceNumber=50):
         self.low[-1]= np.maximum(0,sliceNumber - self.dataSize[-1] + 1)
-        self.high[-1]=np.minimum(self.high[-1], sliceNumber + self.dataSize[-1] - 1)
+        self.high[-1]=np.minimum(self.high[-1], sliceNumber + self.dataSize[-1] -1)
 
         return(self)
 
@@ -355,8 +355,8 @@ def transGenerator(gen):
         X1 = rotation_3d(X1, angle_list)
         X2= rotation_3d(X2, angle_list)
         Y = rotation_3d(Y, angle_list)
-
         X2[...,0]=X2[...,0]*gen.ph
+        #Image.fromarray(X1[0,:,:,3,0]).show
         yield {'input_data': X1, 'input_weight': X2}, Y
 
 

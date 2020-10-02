@@ -55,8 +55,11 @@ def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 120
         file = file_list[i]
         weight=np.array(Image.open(label_folder+'/'+file))
         slice=int(file.split('.')[0])-1
-        #label=OneHotEncoding(label)
-        ph[...,slice,0]=weight/45
+        weight=weight/46
+        print(np.unique(weight))
+        weight=weight*weight+0.1
+
+        ph[...,slice,0]=weight
 
 
 

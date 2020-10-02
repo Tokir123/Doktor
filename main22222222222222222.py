@@ -71,8 +71,8 @@ for i in range(different_models):
     model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=2 ,activation='softmax',loss='categorical_crossentropy')
     model=addWeightTo3DModel(model, keras.losses.categorical_crossentropy,lr=lr)
 
-   # model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
-    l=model.fit_generator(myGen,steps_per_epoch=2000,epochs=1)
+    model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
+    l=model.fit_generator(myGen,steps_per_epoch=10000,epochs=1)
 
 
     model.save_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
@@ -95,7 +95,7 @@ for i in range(different_models):
 
     padded_image = ImagePadSym(image_norm)
     big = Apply(ModelTo3D_single, model, data=padded_image[np.newaxis, ...], input_size=target_size,
-                padding=(20, 20, 20))
+                padding=(10, 10, 10))
 
     bigg = big * 120
     bigg = bigg.astype(np.uint8)[..., 50:150]
