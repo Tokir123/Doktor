@@ -49,8 +49,8 @@ for i in range(different_models):
     dims = image.shape
     labels = MakeLabel(full_image_size=image.shape)
     weights = MakeWeight(full_image_size=image.shape)
-    size = 64
-    depth = 64
+    size = 96
+    depth = 96
     class_weights = (1, 1, 10)
 
     folder_name = 'normmm'
@@ -62,7 +62,7 @@ for i in range(different_models):
     target_size = (size, size, depth)
 
     downscale_factor = 2**i
-    batch_size = 4#*downscale_factor
+    batch_size = 1#*downscale_factor
 
     dataGenerator=dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=batch_size, slice_label=50,class_weights=class_weights)
 
@@ -72,7 +72,7 @@ for i in range(different_models):
     model=addWeightTo3DModel(model, keras.losses.categorical_crossentropy,lr=lr)
 
     model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
-    l=model.fit_generator(myGen,steps_per_epoch=15000,epochs=1)
+    l=model.fit_generator(myGen,steps_per_epoch=20000,epochs=1)
 
 
     model.save_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
@@ -95,7 +95,7 @@ for i in range(different_models):
 
     padded_image = ImagePadSym(image_norm)
     big = Apply(ModelTo3D_single, model, data=padded_image[np.newaxis, ...], input_size=target_size,
-                padding=(10, 10, 10))
+                padding=(20, 20, 20))
 
     bigg = big * 120
     bigg = bigg.astype(np.uint8)[..., 50:150]

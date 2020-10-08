@@ -373,7 +373,7 @@ class dataGen(object):
         self.class_weights = class_weights
         self.padding=padding
         self.ph=np.zeros(shape=(self.batch_size,)+self.target_size)
-        self.ph[:,8:self.target_size[0]-8,8:self.target_size[0]-8,8:self.target_size[0]-8]=1
+        self.ph[:,12:self.target_size[0]-12,12:self.target_size[0]-12,12:self.target_size[0]-12]=1
     def __next__(self):
         cutouts_low, cutouts_high =BoxGenerator3D(low=self.lower, high=self.upper,
                                                    dataSize=self.target_size).includeSlice(self.slice_label).getCoordinates(batch_size=self.batch_size)
