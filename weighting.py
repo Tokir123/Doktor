@@ -69,3 +69,6 @@ for pixel in np.ndindex(labels.shape):
 weighting=(weighting/(np.max(weighting))*249).astype(np.uint8)
 img = Image.fromarray(weighting)
 img.show()
+
+"""weighting for pixels in particles is not done at this point, can set those to np.mean of the other pixels
+"""

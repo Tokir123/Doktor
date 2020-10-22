@@ -361,7 +361,14 @@ def transGenerator(gen):
 
 
 class dataGen(object):
-    def   __init__(self, image, labels, weights, lower, upper, target_size=(80,80,80), batch_size=1,slice_label=50, class_weights=(0.5,2,20),padding=18):
+
+    """"is a generator object that gives a generator that can work with model.fit_generator
+    slice label is the the slice number for which we have a label, this slice will always be included in the generated box
+    class weights is depreciated
+
+
+    """
+    def   __init__(self, image, labels, weights, lower, upper, target_size=(80,80,80), batch_size=1,slice_label=50, class_weights=(0.5,2,20),padding=25):
         self.batch_size = batch_size
         self.image = image
         self.labels = labels
@@ -373,23 +380,23 @@ class dataGen(object):
         self.class_weights = class_weights
         self.padding=padding
         self.ph=np.zeros(shape=(self.batch_size,)+self.target_size)
-        self.ph[:,12:self.target_size[0]-12,12:self.target_size[0]-12,12:self.target_size[0]-12]=1
+        self.ph[:,15:self.target_size[0]-15,15:self.target_size[0]-15,15:self.target_size[0]-15]=1
     def __next__(self):
         cutouts_low, cutouts_high =BoxGenerator3D(low=self.lower, high=self.upper,
                                                    dataSize=self.target_size).includeSlice(self.slice_label).getCoordinates(batch_size=self.batch_size)
-        rand = np.random.random(1)
+        #rand = np.random.random(1)
 
-        rand = 1 + (rand - 0.5)/5
-        slice=randint(0,63)
+        #rand = 1 + (rand - 0.5)/5
+        #slice=randint(0,63)
         image = getCutOut(self.image, cutouts_low, cutouts_high)
         weights=getCutOut(self.weights, cutouts_low, cutouts_high)
-        mean = np.mean(image[0,slice,slice,...])
-        std = np.std(image[0,slice,slice,...])
-        if std==0:
-            std=1
+        #mean = np.mean(image[0,slice,slice,...])
+        #std = np.std(image[0,slice,slice,...])
+        #if std==0:
+        #    std=1
         
-        image = (image - mean)
-        image=image*rand
+        #image = (image - mean)
+        #image=image*rand
         labels = getCutOut(self.labels, cutouts_low, cutouts_high)
 
 
@@ -399,6 +406,10 @@ class dataGen(object):
         return {'input_data': image, 'input_weight': weights}, labels
 
 def CorrectGen(gen,model):
+    """depreciated
+
+    """
+
     while True:
         # generate random vector
         # make random transformation

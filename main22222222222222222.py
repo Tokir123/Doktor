@@ -78,8 +78,8 @@ for i in range(different_models):
     model.save_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
     padded_image = ImagePadSym(image[..., 0])
 
-    image = sitk.ReadImage('images/training/source/wda/image.mha')
-
+    #image = sitk.ReadImage('images/training/source/wda/image.mha')
+    image  = sitk.ReadImage('training_data/image/image.mha')
     ####Import
 
     ####Import Done
@@ -87,15 +87,20 @@ for i in range(different_models):
     image = np.moveaxis(sitk.GetArrayFromImage(image), 0, -1)
     for j in range(9):
         image[..., j] = image[..., 9]
-    mean = np.mean(image[image != 0])
-    std = np.std(image[image != 0])
-    image_norm = image
-    image_norm[image == 0] = np.min(image[image != 0])
-    image_norm = (image - mean) / std
+
+    mean = np.mean(image)
+    std = np.std(image)
+    image = (image - mean) / std
+    image_norm=image
+#    mean = np.mean(image[image != 0])
+#    std = np.std(image[image != 0])
+#    image_norm = image
+#    image_norm[image == 0] = np.min(image[image != 0])
+#    image_norm = (image - mean) / std
 
     padded_image = ImagePadSym(image_norm)
     big = Apply(ModelTo3D_single, model, data=padded_image[np.newaxis, ...], input_size=target_size,
-                padding=(20, 20, 20))
+                padding=(35, 35, 35))
 
     bigg = big * 120
     bigg = bigg.astype(np.uint8)[..., 50:150]

@@ -4,10 +4,12 @@ from keras.layers import Conv3D, MaxPooling3D, Dropout, UpSampling3D, Concatenat
 from keras.optimizers import Adam
 import numpy as np
 
+
 def unet3D(pretrained_weights=None, input_size=(256, 256, 256, 1), kernelSize=3, outputSize=1, activation='sigmoid',lr=1e-3,
            loss='binary_crossentropy',downscale_factor=1):
     """
-    Creates a 3D U-Net
+    Creates a 3D U-Net with batch normalization
+    padding is same, we avoid the padding issues by giving the outer elements in the image array a weight of 0
     :param pretrained_weights:
     :param input_size:
     :param kernelSize:
@@ -94,6 +96,8 @@ def unet3D(pretrained_weights=None, input_size=(256, 256, 256, 1), kernelSize=3,
 def addWeightTo3DModel(model, loss,lr=1e-4):
     """
     Add additional input layer to model (for inputing custom weights)
+
+    these weights are important to emphazise border regions inbetween particles
     :param model:
     :param loss:
     :return:
