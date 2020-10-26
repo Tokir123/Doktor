@@ -32,7 +32,7 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
                        center_square - square_size])
     pts2 = pts1 + random_state.uniform(-alpha_affine, alpha_affine, size=pts1.shape).astype(np.float32)
     M = cv2.getAffineTransform(pts1, pts2)
-    image = cv2.warpAffine(image, M, shape_size[::-1], borderMode=cv2.BORDER_REFLECT_101)
+    #image = cv2.warpAffine(image, M, shape_size[::-1], borderMode=cv2.BORDER_REFLECT_101,flags=cv2.INTER_NEAREST)
 
     dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
     dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
@@ -41,7 +41,7 @@ def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
     x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
     indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
 
-    return map_coordinates(image, indices, order=1, mode='reflect').reshape(shape)
+    return map_coordinates(image, indices, order=0, mode='reflect').reshape(shape)
 
 def draw_grid(im, grid_size):
     # Draw grid lines
@@ -53,7 +53,7 @@ def draw_grid(im, grid_size):
 # Load images
 im = cv2.imread("50.tif", -1)
 im_mask = cv2.imread("50.tif", -1)
-#im = sitk.ReadImage('images/training/source/wda/image.mha')
+im = sitk.ReadImage('images/training/source/wda/image.mha')
 #im_mask = sitk.ReadImage('images/training/source/wda/image.mha')
 #im = np.moveaxis(sitk.GetArrayFromImage(im), 0, -1)
 #im_mask = np.moveaxis(sitk.GetArrayFromImage(im_mask), 0, -1)

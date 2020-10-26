@@ -352,10 +352,31 @@ def transGenerator(gen):
 
         X1 = X.get('input_data')
         X2 = X.get('input_weight')
+
+        shape = X1[0, ..., 0].shape
+        alpha = shape[1] * 10
+        sigma = shape[1] * 0.08
+        random_state = np.random.RandomState(None)
+
+        dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
+        dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
+        dz = np.zeros_like(dx)
+        x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
+        indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
+
+        X1[0, ..., 0] = map_coordinates(X1[0, ..., 0], indices, order=2, mode='reflect').reshape(shape)
+        X2[0, ..., 0] = map_coordinates(X2[0, ..., 0], indices, order=0, mode='reflect').reshape(shape)
+        Y[0, ..., 0] = map_coordinates(Y[0, ..., 0], indices, order=0, mode='reflect').reshape(shape)
+
+
         X1 = rotation_3d(X1, angle_list)
         X2= rotation_3d(X2, angle_list)
         Y = rotation_3d(Y, angle_list)
         X2[...,0]=X2[...,0]*gen.ph
+
+
+
+
         #Image.fromarray(X1[0,:,:,3,0]).show
         yield {'input_data': X1, 'input_weight': X2}, Y
 
@@ -384,19 +405,19 @@ class dataGen(object):
     def __next__(self):
         cutouts_low, cutouts_high =BoxGenerator3D(low=self.lower, high=self.upper,
                                                    dataSize=self.target_size).includeSlice(self.slice_label).getCoordinates(batch_size=self.batch_size)
-        #rand = np.random.random(1)
+        rand = np.random.random(1)
 
-        #rand = 1 + (rand - 0.5)/5
-        #slice=randint(0,63)
+        rand = 1 + (rand - 0.5)/5
+        slice=randint(0,self.target_size[0]-1)
         image = getCutOut(self.image, cutouts_low, cutouts_high)
         weights=getCutOut(self.weights, cutouts_low, cutouts_high)
-        #mean = np.mean(image[0,slice,slice,...])
-        #std = np.std(image[0,slice,slice,...])
-        #if std==0:
-        #    std=1
+        mean = np.mean(image[0,slice,slice,...])
+        std = np.std(image[0,slice,slice,...])
+        if std==0:
+            std=1
         
-        #image = (image - mean)
-        #image=image*rand
+        image = (image - mean)
+        image=image*rand
         labels = getCutOut(self.labels, cutouts_low, cutouts_high)
 
 

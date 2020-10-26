@@ -3,8 +3,13 @@ import SimpleITK as sitk
 import scipy
 from numpy import shape
 from PIL import Image
+import cv2
+from scipy.ndimage.interpolation import map_coordinates
+from scipy.ndimage.filters import gaussian_filter
+import matplotlib.pyplot as plt
 from CnM.generators import *
 import os
+import copy
 def OneHotEncoding(image):
 
     uq = np.unique(image)
@@ -27,20 +32,22 @@ def   MakeLabel(label_folder='training_data/labels',full_image_size=(1008, 1204,
     :return:
     '''
     file_list=os.listdir(label_folder)
-    ph=np.zeros(shape=full_image_size+(2,))+4
+    ph=np.zeros(shape=full_image_size+(1,))#+4
     for i in range(len(file_list)):
         file = file_list[i]
         label=np.array(Image.open(label_folder+'/'+file))
         if len(label.shape)==3:
             label=label[...,0]
         print(label.shape)
+        print(np.mean(label))
         slice=int(file.split('.')[0])-1
-        label=OneHotEncoding(label)
-        print(label.shape)
-        ph[...,slice,:]=label
+        label=OneHotEncoding(label)[...,1]
+        print(np.mean(label))
+        ph[...,slice,:]=label[...,np.newaxis]
 
-
-
+    print(ph.shape)
+    print(np.unique(ph))
+    print(np.mean(ph))
     return ph
 
 def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 1204, 101)):
@@ -56,7 +63,7 @@ def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 120
         weight=np.array(Image.open(label_folder+'/'+file))
         slice=int(file.split('.')[0])-1
         weight=weight/14
-        print(np.unique(weight))
+
         weight=weight*weight+0.1
 
         ph[...,slice,0]=weight
@@ -97,6 +104,32 @@ def BatchToOutput(model,image):
 
     return output
 
+def elastic_transform(image, alpha, sigma, alpha_affine, random_state=None):
+    """Elastic deformation of images as described in [Simard2003]_ (with modifications).
+    .. [Simard2003] Simard, Steinkraus and Platt, "Best Practices for
+         Convolutional Neural Networks applied to Visual Document Analysis", in
+         Proc. of the International Conference on Document Analysis and
+         Recognition, 2003.
+
+     Based on https://gist.github.com/erniejunior/601cdf56d2b424757de5
+    """
+
+    image_data=image[0,...,0]
+    if random_state is None:
+        random_state = np.random.RandomState(None)
+
+    shape = image_data.shape
+
+    dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
+    dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
+    dz = np.zeros_like(dx)
+
+    x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
+    indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
+    image_data=map_coordinates(image_data, indices, order=0, mode='reflect').reshape(shape)
+    image[0,...,0]=image_data
+    return map_coordinates(image, indices, order=0, mode='reflect').reshape(shape)
+
 def ModelTo3D_single(model,image):
 
     pred_image = image[ ..., np.newaxis]
@@ -104,8 +137,8 @@ def ModelTo3D_single(model,image):
     A = {'input_data': pred_image, 'input_weight': pred_weights}
     output_OH=model.predict(A)
     exclude_weights=output_OH.shape[-1]-1
-    output=output_OH[0,...,0:exclude_weights]
-    output=np.argmax(output,axis=-1)
+    output=output_OH[0,...,0]#:exclude_weights]
+    #output=np.argmax(output,axis=-1)
 
     return output
 
@@ -225,7 +258,7 @@ def rotation_3d(batch, angle_list):
     """
     if len(batch.shape)==3:
         batch=np.array([batch[...,np.newaxis] for i in range(angle_list.shape[0])])
-        print(batch.shape)
+
 
     batch_rot = np.zeros(batch.shape)
     for i in range(batch.shape[0]):

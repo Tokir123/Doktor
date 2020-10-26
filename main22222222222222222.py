@@ -68,8 +68,8 @@ for i in range(different_models):
 
     myGen=transGenerator(dataGenerator)
 
-    model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=2 ,activation='softmax',loss='categorical_crossentropy')
-    model=addWeightTo3DModel(model, keras.losses.categorical_crossentropy,lr=lr)
+    model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=1 ,activation='sigmoid',loss='binary_crossentropy')
+    model=addWeightTo3DModel(model, keras.losses.binary_crossentropy,lr=lr)
 
     model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
     l=model.fit_generator(myGen,steps_per_epoch=20000,epochs=1)
@@ -116,6 +116,8 @@ for i in range(different_models):
     sitk.WriteImage(img, folder_name +'/'+ str(i)+'big.mha')
 
 
-biggg=average_pictures(bigstack,required_ratio=0.6)
+#biggg=average_pictures(bigstack,required_ratio=0.6)
+biggg=np.sum(bigstack,axis=0)/5
+biggg=biggg.astype(np.uint8)
 img = sitk.GetImageFromArray(biggg)
 sitk.WriteImage(img, folder_name +'/'+ str(7)+'big.mha')
