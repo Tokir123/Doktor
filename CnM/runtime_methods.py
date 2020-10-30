@@ -64,7 +64,7 @@ def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 120
         slice=int(file.split('.')[0])-1
         weight=weight/14
 
-        weight=weight*weight+0.1
+        weight=weight*weight+0.2
 
         ph[...,slice,0]=weight
 
@@ -265,16 +265,16 @@ def rotation_3d(batch, angle_list):
         for j in range(batch.shape[-1]):
             image1 = batch[i,...,j]
             angle = angle_list[i,0]
-            image1 = scipy.ndimage.rotate(image1, angle,order=0, mode='nearest', axes=(0, 1), reshape=False,prefilter=False)
+            image1 = scipy.ndimage.rotate(image1, angle,order=0, mode='reflect', axes=(0, 1), reshape=False,prefilter=False)
 
             # rotate along y-axis
             angle = angle_list[i,1]
-            image1 = scipy.ndimage.rotate(image1, angle,order=0, mode='nearest', axes=(0, 2), reshape=False, prefilter=False
+            image1 = scipy.ndimage.rotate(image1, angle,order=0, mode='reflect', axes=(0, 2), reshape=False, prefilter=False
                                           )
 
             # rotate along x-axis
             angle = angle_list[i,2]
-            batch_rot[i,...,j] = scipy.ndimage.rotate(image1, angle,order=0, mode='nearest', axes=(1, 2), reshape=False,prefilter=False)
+            batch_rot[i,...,j] = scipy.ndimage.rotate(image1, angle,order=0, mode='reflect', axes=(1, 2), reshape=False,prefilter=False)
             #                print(i)
 
     return batch_rot

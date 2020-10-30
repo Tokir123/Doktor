@@ -4,6 +4,8 @@ from CnM.generators import *
 from CnM.models import *
 from CnM.runtime_methods import *
 from CnM.post_methods import *
+from CnM.denseunet3d import *
+from CnM.hybridnet import *
 import SimpleITK as sitk
 import keras
 import tensorflow as tf
@@ -12,7 +14,7 @@ import keras.backend.tensorflow_backend as K
 from keras.models import load_model
 from numba import cuda
 import time
-
+from CnM.cust_callback import *
 #export TF_ENABLE_AUTO_MIXED_PRECISION=1
 
 #K.set_floatx('float32')
@@ -26,9 +28,8 @@ different_models=5
 
 for i in range(different_models):
 
-# for i in (0,):
     i=i+1
-    lr=(1e-3)/5
+    lr=(1e-3)/10
     print(i)
     if i>1:
         del model
@@ -49,8 +50,8 @@ for i in range(different_models):
     dims = image.shape
     labels = MakeLabel(full_image_size=image.shape)
     weights = MakeWeight(full_image_size=image.shape)
-    size = 96
-    depth = 96
+    size = 64
+    depth = 64
     class_weights = (1, 1, 10)
 
     folder_name = 'normmm'
@@ -65,17 +66,24 @@ for i in range(different_models):
     batch_size = 1#*downscale_factor
 
     dataGenerator=dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=batch_size, slice_label=50,class_weights=class_weights)
-    CallbackGenerator=dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=250, slice_label=50,class_weights=class_weights,callback_mode=True)
+    CallbackGenerator = dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=2,
+                                slice_label=50, class_weights=class_weights, callback_mode=True)
     myGen=transGenerator(dataGenerator)
 
-    model=unet3D(downscale_factor=downscale_factor,kernelSize=3,input_size=target_size+(1,),outputSize=1 ,activation='sigmoid',loss='binary_crossentropy')
+    #model=denseunet_3d(input_size=(64, 64, 64, 1))
+    model=dilated_resnet(input_size=(64, 64, 64, 1))
+
     model=addWeightTo3DModel(model, keras.losses.binary_crossentropy,lr=lr)
+    #model.load_weights(folder_name + '/my_model_weights' + str(i) + '.h5')
+    #model.load_weights(folder_name+'/model_best.hdf5')
+    #model_checkpoint = tf.keras.callbacks.ModelCheckpoint('/weights.{epoch:02d}-{loss:.2f}.hdf5',
+                                      # monitor='loss', verbose=1,
+                                       #save_best_only=False, save_weights_only=False, mode='min', period=1)
+    validation = ValidationCallback(CallbackGenerator, patience=10)
+    l=model.fit_generator(myGen,steps_per_epoch=100,epochs=100,callbacks=[validation])
 
-    model.load_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
-    l=model.fit_generator(myGen,steps_per_epoch=40000,epochs=1)
 
-
-    model.save_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
+    model.save_weights(folder_name+'/my_model_weights'+str(i)+'.hdf5')
     padded_image = ImagePadSym(image[..., 0])
 
     #image = sitk.ReadImage('images/training/source/wda/image.mha')
@@ -121,3 +129,15 @@ biggg=np.sum(bigstack,axis=0)/5
 biggg=biggg.astype(np.uint8)
 img = sitk.GetImageFromArray(biggg)
 sitk.WriteImage(img, folder_name +'/'+ str(7)+'big.mha')
+# 400 355 18
+#680 260 10
+#900 360 35
+x=520
+y=180
+z=10
+new_picture=image[x:x+64,y:y+64,z:z+64]
+sitk.WriteImage(sitk.GetImageFromArray(new_picture), 'validation/images/'+ str(2)+'.mha')
+new_picture=labels[x:x+64,y:y+64,z:z+64]
+sitk.WriteImage(sitk.GetImageFromArray(new_picture), 'validation/labels/'+ str(2)+'.mha')
+new_picture=weights[x:x+64,y:y+64,z:z+64]
+sitk.WriteImage(sitk.GetImageFromArray(new_picture), 'validation/weights/'+ str(2)+'.mha')

@@ -105,12 +105,13 @@ def addWeightTo3DModel(model, loss,lr=1e-4):
     input = model.input
     output = model.output
 
-    newInput = Input((model.input_shape[1], model.input_shape[2], model.input_shape[3], model.input_shape[4]),
+    newInput = Input(batch_shape=(1,model.input_shape[1], model.input_shape[2], model.input_shape[3], model.input_shape[4]),
                      name="input_weight")
     numChannels = model.output_shape[-1]
 
     print("agha")
     print(input.shape)
+    print(newInput.shape)
     print(output.shape)
     newOutput = Concatenate(axis=-1)([output, newInput])
 

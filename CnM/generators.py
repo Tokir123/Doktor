@@ -364,9 +364,10 @@ def transGenerator(gen):
         x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
         indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
 
-        X1[0, ..., 0] = map_coordinates(X1[0, ..., 0], indices, order=2, mode='reflect').reshape(shape)
-        X2[0, ..., 0] = map_coordinates(X2[0, ..., 0], indices, order=0, mode='reflect').reshape(shape)
-        Y[0, ..., 0] = map_coordinates(Y[0, ..., 0], indices, order=0, mode='reflect').reshape(shape)
+        for i in range(batch_size):
+            X1[i, ..., 0] = map_coordinates(X1[i, ..., 0], indices, order=2, mode='reflect').reshape(shape)
+            X2[i, ..., 0] = map_coordinates(X2[i, ..., 0], indices, order=0, mode='reflect').reshape(shape)
+            Y[i, ..., 0] = map_coordinates(Y[i, ..., 0], indices, order=0, mode='reflect').reshape(shape)
 
 
         X1 = rotation_3d(X1, angle_list)
@@ -389,7 +390,7 @@ class dataGen(object):
 
 
     """
-    def   __init__(self, image, labels, weights, lower, upper, target_size=(80,80,80), batch_size=1,slice_label=50, class_weights=(0.5,2,20),padding=25):
+    def   __init__(self, image, labels, weights, lower, upper, target_size=(80,80,80), batch_size=1,slice_label=50, class_weights=(0.5,2,20),padding=25, callback_mode=False):
         self.batch_size = batch_size
         self.image = image
         self.labels = labels
@@ -401,7 +402,8 @@ class dataGen(object):
         self.class_weights = class_weights
         self.padding=padding
         self.ph=np.zeros(shape=(self.batch_size,)+self.target_size)
-        self.ph[:,15:self.target_size[0]-15,15:self.target_size[0]-15,15:self.target_size[0]-15]=1
+        self.ph[:,12:self.target_size[0]-12,12:self.target_size[0]-12,12:self.target_size[0]-12]=1
+        self.callback_mode=callback_mode
     def __next__(self):
         cutouts_low, cutouts_high =BoxGenerator3D(low=self.lower, high=self.upper,
                                                    dataSize=self.target_size).includeSlice(self.slice_label).getCoordinates(batch_size=self.batch_size)
@@ -419,7 +421,8 @@ class dataGen(object):
         image = (image - mean)
         image=image*rand
         labels = getCutOut(self.labels, cutouts_low, cutouts_high)
-
+        if(self.callback_mode):
+            weights[..., 0]=weights[..., 0]*self.ph
 
 
         ######
