@@ -1,9 +1,34 @@
 from CnM.generators import *
 import keras
 import tensorflow as tf
+import numpy as np
+from PIL import Image
+from CnM.generators import *
+from CnM.models import *
+from CnM.runtime_methods import *
+from CnM.post_methods import *
+from CnM.denseunet3d import *
+from CnM.hybridnet import *
+import SimpleITK as sitk
+import keras
+import tensorflow as tf
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
+import keras.backend.tensorflow_backend as K
+from keras.models import load_model
+from numba import cuda
+import time
+import copy
+from CnM.generators import *
 class ValidationCallback(tf.keras.callbacks.Callback):
-    def __init__(self,generator,  patience=0):
+    def __init__(self,generator, image_val, weights_val,labels_val , patience=0,downscale_factor=1
+                 ):
         super(ValidationCallback, self).__init__()
+        self.downscale_factor = downscale_factor
+        self.image_val=image_val
+        self.weights_val=weights_val
+
+        self.labels_val = labels_val
+
         self.patience = patience
         self.best = np.Inf
         self.best_weights = None
@@ -11,9 +36,9 @@ class ValidationCallback(tf.keras.callbacks.Callback):
         self.resets=0
         self.im=[]
         self.la = []
-        self.val_size=150
+        self.val_size=1
+
         for i in range(self.val_size):
-            print(i)
             self.validation_X,self.validation_Y=next(generator)
             self.im.append(self.validation_X)
             self.la.append(self.validation_Y)
@@ -25,15 +50,14 @@ class ValidationCallback(tf.keras.callbacks.Callback):
         self.val_uas = []
 
     def on_epoch_end(self, epoch, logs=None):
-        val=0
+        #val=0
         #with tf.device('/cpu:0'):
-        for i in range(self.val_size):
-            val=val+self.model.evaluate(self.im[i], self.la[i],verbose=0)[0]
+        #    for i in range(self.val_size):
+        #        val=val+self.model.evaluate(self.im[i], self.la[i],verbose=0)[0]
+        val=prediction_model(self.model, self.image_val, self.weights_val, self.labels_val,verbose=True,downscale_factor=self.downscale_factor)
 
 
-
-        val=val/self.val_size
-        val=val/2
+        #val=val/self.val_size
         current=val
         ua_score = val
         self.val_uas.append(ua_score)
@@ -46,6 +70,7 @@ class ValidationCallback(tf.keras.callbacks.Callback):
             self.wait = 0
             self.best_weights = self.model.get_weights()
             self.resets=0
+            self.model.save_weights('model_weights/' + str(val) + '.h5')
         else:
             self.wait += 1
             print('Not good enough')
@@ -61,8 +86,9 @@ class ValidationCallback(tf.keras.callbacks.Callback):
                 self.model.set_weights(self.best_weights)
                 self.wait=0
                 self.resets+=1
+            '''
             if(self.resets>=self.max_resets):
-                self.val_size = self.val_size+50
+                #self.val_size = self.val_size+50
                 print("New validation data")
                 self.im = []
                 self.la = []
@@ -73,16 +99,135 @@ class ValidationCallback(tf.keras.callbacks.Callback):
                     self.la.append(self.validation_Y)
                 self.resets=0
                 print("Calculating new best score")
-                val = 0
+                #val = 0
+                #with tf.device('/cpu:0'):
+                #    for i in range(self.val_size):
+                #        val = val + self.model.evaluate(self.im[i], self.la[i], verbose=0)[0]
 
-                for i in range(self.val_size):
-                    val = val + self.model.evaluate(self.im[i], self.la[i], verbose=0)[0]
+                #val = val / self.val_size
 
-                val = val / self.val_size
-                val = val / 2
-                self.best=val
+                self.best=verification_model(self.model, self.image_val, self.weights_val, self.labels_val)
                 print(self.best)
+                '''
 
+
+def verification_model(model,image,weights,labels):
+
+    shape=copy.deepcopy(image.shape)
+    image=image[np.newaxis,...,np.newaxis]
+    labels = labels[np.newaxis, ..., np.newaxis]
+    weights = weights[np.newaxis, ..., np.newaxis]
+    A= {'input_data': image, 'input_weight': weights}
+    with tf.device('/cpu:0'):
+        big_model = dilated_resnet(input_size=shape + (1,))
+        big_model = addWeightTo3DModel(big_model, tf.keras.losses.BinaryCrossentropy(), lr=1e-4)
+        big_model.set_weights(model.get_weights())
+        val=big_model.evaluate(A,labels)[0]
+    return val
+
+def prediction_model(model,image,weights,labels,verbose=False,downscale_factor=1):
+
+    shape=copy.deepcopy(image.shape)
+    image=image[np.newaxis,...,np.newaxis]
+    labels = labels[np.newaxis, ..., np.newaxis]
+    weights = weights[np.newaxis, ..., np.newaxis]
+    A= {'input_data': image, 'input_weight': weights}
+    with tf.device('/cpu:0'):
+        #big_model = dilated_resnet_pad(input_size=shape + (1,),downscale_factor=downscale_factor)
+        big_model = unet3D_pad(input_size=shape + (1,),downscale_factor=downscale_factor)
+        big_model = addWeightTo3DModel(big_model, tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE), lr=1e-4)
+        big_model.set_weights(model.get_weights())
+        val=big_model.predict(A)
+    import pdb
+    #pdb.set_trace()
+    ph=val[...,0]
+    lo_f=tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
+    lo=lo_f(labels, ph[...,np.newaxis])
+    print("loss shape is")
+    print(lo.shape)
+
+    lo=lo[...,np.newaxis]
+    score=lo*A.get('input_weight')
+    score=np.sum(score)/np.sum(A.get('input_weight'))
+
+
+
+    if(verbose):
+        matrix=copy.deepcopy(val[0,...,0])
+
+        matrix = matrix * 240/np.max(matrix)
+        matrix =matrix.astype(np.uint8)
+
+        matrix = np.swapaxes(matrix, 0, -1)
+        matrix = np.swapaxes(matrix, 1, 2)
+
+        img = sitk.GetImageFromArray(matrix)
+        sitk.WriteImage(img, 'inference/predictions' + '/' + str(score) + '.mha')
+
+        matrix = copy.deepcopy(lo.numpy())
+        matrix=matrix[0,...,0]
+
+        matrix = matrix * 240 / np.max(matrix)
+        matrix = matrix.astype(np.uint8)
+
+        matrix = np.swapaxes(matrix, 0, -1)
+        matrix = np.swapaxes(matrix, 1, 2)
+
+        img = sitk.GetImageFromArray(matrix)
+        sitk.WriteImage(img, 'inference/losses' + '/' + str(score) + '.mha')
+        matrix = copy.deepcopy(lo.numpy())
+        matrix=matrix*A.get("input_weight")
+        matrix = matrix[0, ..., 0]
+
+        matrix = matrix * 240 / np.max(matrix)
+        matrix = matrix.astype(np.uint8)
+
+        matrix = np.swapaxes(matrix, 0, -1)
+        matrix = np.swapaxes(matrix, 1, 2)
+
+        img = sitk.GetImageFromArray(matrix)
+        sitk.WriteImage(img, 'inference/weighted_losses' + '/' + str(score) + '.mha')
+    return score
+
+
+def big_prediction_model( image,weights_file,downscale_factor=2, target_size=(304,304,96), verbose=False):
+
+    data = ImagePadSym(image)
+
+    for j in range(2):
+        transform = Identity3D()
+        for i in range(5):
+            transform = ConcetenateTrafo3D(
+                ConcetenateTrafo3D(transform, Mirror3D(randint(0, 2))), Rotation3D(axis=randint(0, 2), k=randint(0, 3)))
+
+
+        trans_dat=transform.transform(data)
+        trans_pad=transform.transform(np.zeros((51,51,24)))
+        trans_target_size = transform.transform(np.zeros(target_size))
+        big_model = unet3D_pad(input_size=trans_target_size.shape, batch_size=1, downscale_factor=downscale_factor)
+        big_model.load_weights(weights_file)
+        with tf.device('/cpu:0'):
+            big = Apply_model(big_model.predict, data=trans_dat[np.newaxis, ...,np.newaxis], input_size=trans_target_size.shape,
+                              padding=trans_pad.shape)[0,...]
+        if(j==0):
+            res=transform.inverseTransform(big)
+        else:
+            res=res+transform.inverseTransform(big)
+
+
+    res=res/2
+    matrix = copy.deepcopy(res[ ...])
+
+    matrix = matrix * 240 / np.max(matrix)
+    matrix = matrix.astype(np.uint8)
+
+    matrix = np.swapaxes(matrix, 0, -1)
+    matrix = np.swapaxes(matrix, 1, 2)
+
+    img = sitk.GetImageFromArray(matrix)
+    sitk.WriteImage(img, 'inference/full' + '/' + str(np.random.random()) + '.mha')
+
+    return
 
 class CustomCallback(keras.callbacks.Callback):
 

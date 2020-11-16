@@ -14,9 +14,11 @@ import keras.backend.tensorflow_backend as K
 from keras.models import load_model
 from numba import cuda
 import time
+#from tensorflow.keras.losses import BinaryCrossentropy
 from CnM.cust_callback import *
+import copy
 #export TF_ENABLE_AUTO_MIXED_PRECISION=1
-
+tf.config.experimental.list_physical_devices('GPU')
 #K.set_floatx('float32')
 
 ####Import
@@ -29,7 +31,7 @@ different_models=5
 for i in range(different_models):
 
     i=i+1
-    lr=(1e-3)/10
+    lr=(1e-4)
     print(i)
     if i>1:
         del model
@@ -49,10 +51,13 @@ for i in range(different_models):
     image = (image - mean) / std
     dims = image.shape
     labels = MakeLabel(full_image_size=image.shape)
-    weights = MakeWeight(full_image_size=image.shape)
-    size = 64
-    depth = 64
+    weights = MakeWeight(full_image_size=image.shape,difficulty=2)
+    size = 80
+    depth = 80
     class_weights = (1, 1, 10)
+    d=2
+    b=2
+
 
     folder_name = 'normmm'
     label_folder = 'adw'
@@ -63,29 +68,49 @@ for i in range(different_models):
     target_size = (size, size, depth)
 
     downscale_factor = 2**i
-    batch_size = 1#*downscale_factor
+    batch_size = b#*downscale_factor
 
-    dataGenerator=dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=batch_size, slice_label=50,class_weights=class_weights)
-    CallbackGenerator = dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=2,
+    dataGenerator=dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=batch_size, slice_label=50,class_weights=class_weights,callback_mode=False)
+    CallbackGenerator = dataGen(image, labels, weights, lower=min, upper=max, target_size=target_size, batch_size=256,
                                 slice_label=50, class_weights=class_weights, callback_mode=True)
-    myGen=transGenerator(dataGenerator)
+    myGen=transGenerator(dataGenerator,deformations=True)
 
     #model=denseunet_3d(input_size=(64, 64, 64, 1))
-    model=dilated_resnet(input_size=(64, 64, 64, 1))
 
-    model=addWeightTo3DModel(model, keras.losses.binary_crossentropy,lr=lr)
+    #model=dilated_resnet_pad(input_size=target_size+(1,), batch_size=b, downscale_factor=d, mode=True)
+    model = unet3D_pad(input_size=target_size + (1,), batch_size=b, downscale_factor=d, mode=True)
+
+    #model=addWeightTo3DModel(model,  tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE) ,batch_size=b,lr=lr)
+
+    model.load_weights( 'model_weights/0.13982934191561683.h5')
+
+    #model_2 = dilated_resnet_pad(input_size=target_size + (1,), batch_size=b, downscale_factor=d, mode=True)
+    #model=fuse_models(model,model_2)
+    model = addWeightTo3DModel(model, tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE),
+                               batch_size=b, lr=lr)
+    image_val=image[186:602,400:800,2:98,0]
+    weights_val = copy.deepcopy(weights[186:602, 400:800, 2:98, 0])
+    correcting = np.zeros(shape=weights_val.shape)
+    correcting[30:weights_val.shape[0] - 30, 30:weights_val.shape[1] - 30, 10:weights_val.shape[2] - 10] = 1
+    weights_val=weights_val*correcting
+
+    labels_val = labels[186:602, 400:800, 2:98, 0]
+    #print(verification_model(model, image_val, weights_val, labels_val))
+    #pred=prediction_model(model, image_val, weights_val, labels_val)
+    print(adwadwa)
+    #print(bruder)
     #model.load_weights(folder_name + '/my_model_weights' + str(i) + '.h5')
     #model.load_weights(folder_name+'/model_best.hdf5')
     #model_checkpoint = tf.keras.callbacks.ModelCheckpoint('/weights.{epoch:02d}-{loss:.2f}.hdf5',
                                       # monitor='loss', verbose=1,
                                        #save_best_only=False, save_weights_only=False, mode='min', period=1)
-    validation = ValidationCallback(CallbackGenerator, patience=10)
-    l=model.fit_generator(myGen,steps_per_epoch=100,epochs=100,callbacks=[validation])
+    validation = ValidationCallback(CallbackGenerator,image_val,weights_val,labels_val, patience=30, downscale_factor=d)
+    l=model.fit_generator(myGen,steps_per_epoch=1000,epochs=100,callbacks=[validation])
 
 
-    model.save_weights(folder_name+'/my_model_weights'+str(i)+'.hdf5')
+    model.save_weights(folder_name+'/my_model_weights'+str(i)+'.h5')
     padded_image = ImagePadSym(image[..., 0])
-
+    big_prediction_model(image[..., 0], 'model_weights/0.13982934191561683.h5', target_size=(304, 304, 96))
     #image = sitk.ReadImage('images/training/source/wda/image.mha')
     image  = sitk.ReadImage('training_data/image/image.mha')
     ####Import
@@ -141,3 +166,7 @@ new_picture=labels[x:x+64,y:y+64,z:z+64]
 sitk.WriteImage(sitk.GetImageFromArray(new_picture), 'validation/labels/'+ str(2)+'.mha')
 new_picture=weights[x:x+64,y:y+64,z:z+64]
 sitk.WriteImage(sitk.GetImageFromArray(new_picture), 'validation/weights/'+ str(2)+'.mha')
+
+
+img = sitk.GetImageFromArray(A.get('input_data'))
+sitk.WriteImage(img, 'dawbig.mha')

@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+
 import cv2
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
@@ -53,7 +53,7 @@ def draw_grid(im, grid_size):
 # Load images
 im = cv2.imread("50.tif", -1)
 im_mask = cv2.imread("50.tif", -1)
-im = sitk.ReadImage('images/training/source/wda/image.mha')
+#im = sitk.ReadImage('images/training/source/wda/image.mha')
 #im_mask = sitk.ReadImage('images/training/source/wda/image.mha')
 #im = np.moveaxis(sitk.GetArrayFromImage(im), 0, -1)
 #im_mask = np.moveaxis(sitk.GetArrayFromImage(im_mask), 0, -1)
@@ -67,7 +67,8 @@ im_merge = np.concatenate((im[...,None], im_mask[...,None]), axis=2)
 #%matplotlib inline
 
 # Apply transformation on image
-im_merge_t = elastic_transform(im_merge, im_merge.shape[1] * 10, im_merge.shape[1] * 0.08, im_merge.shape[1] * 0.08)
+im_merge_t = elastic_transform(im_merge, im_merge.shape[1] *4, im_merge.shape[1] * 0.08, im_merge.shape[1] * 0.08)
+#im_merge_t = elastic_transform(im_merge, 900, 8, im_merge.shape[1] * 0.08)
 
 # Split image and mask
 im_t = im_merge_t[...,0]

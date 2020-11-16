@@ -337,7 +337,7 @@ def transGenerator(gen):
 
         yield {'input_data': X1, 'input_weight': X2}, Y
 
-def transGenerator(gen):
+def transGenerator(gen,deformations=False):
     batch_size=gen.batch_size
     while True:
         # generate random vector
@@ -353,21 +353,22 @@ def transGenerator(gen):
         X1 = X.get('input_data')
         X2 = X.get('input_weight')
 
-        shape = X1[0, ..., 0].shape
-        alpha = shape[1] * 10
-        sigma = shape[1] * 0.08
-        random_state = np.random.RandomState(None)
+        if(deformations):
+            shape = X1[0, ..., 0].shape
+            alpha = shape[1] * 4.5
+            sigma = shape[1] * 0.08
+            random_state = np.random.RandomState(None)
 
-        dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
-        dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
-        dz = np.zeros_like(dx)
-        x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
-        indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
+            dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
+            dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma) * alpha
+            dz = np.zeros_like(dx)
+            x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
+            indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
 
-        for i in range(batch_size):
-            X1[i, ..., 0] = map_coordinates(X1[i, ..., 0], indices, order=2, mode='reflect').reshape(shape)
-            X2[i, ..., 0] = map_coordinates(X2[i, ..., 0], indices, order=0, mode='reflect').reshape(shape)
-            Y[i, ..., 0] = map_coordinates(Y[i, ..., 0], indices, order=0, mode='reflect').reshape(shape)
+            for i in range(batch_size):
+                X1[i, ..., 0] = map_coordinates(X1[i, ..., 0], indices, order=2, mode='reflect').reshape(shape)
+                X2[i, ..., 0] = map_coordinates(X2[i, ..., 0], indices, order=0, mode='reflect').reshape(shape)
+                Y[i, ..., 0] = map_coordinates(Y[i, ..., 0], indices, order=0, mode='reflect').reshape(shape)
 
 
         X1 = rotation_3d(X1, angle_list)
@@ -402,31 +403,39 @@ class dataGen(object):
         self.class_weights = class_weights
         self.padding=padding
         self.ph=np.zeros(shape=(self.batch_size,)+self.target_size)
-        self.ph[:,12:self.target_size[0]-12,12:self.target_size[0]-12,12:self.target_size[0]-12]=1
+        self.ph[:,5:self.target_size[0]-5,5:self.target_size[0]-5,5:self.target_size[0]-5]=1
         self.callback_mode=callback_mode
     def __next__(self):
         cutouts_low, cutouts_high =BoxGenerator3D(low=self.lower, high=self.upper,
                                                    dataSize=self.target_size).includeSlice(self.slice_label).getCoordinates(batch_size=self.batch_size)
+
         rand = np.random.random(1)
 
-        rand = 1 + (rand - 0.5)/5
-        slice=randint(0,self.target_size[0]-1)
+        rand = 1 + (rand - 0.5)/10
+        slice=randint(0,self.target_size[0]-25)
+
+
         image = getCutOut(self.image, cutouts_low, cutouts_high)
         weights=getCutOut(self.weights, cutouts_low, cutouts_high)
-        mean = np.mean(image[0,slice,slice,...])
-        std = np.std(image[0,slice,slice,...])
+
+        mean = np.mean(image[0:self.batch_size+1,slice:slice+24,slice:slice+24,...])
+        std = np.std(image[0:self.batch_size+1,slice:slice+24,slice:slice+24,...])
         if std==0:
             std=1
         
         image = (image - mean)
         image=image*rand
+
+
         labels = getCutOut(self.labels, cutouts_low, cutouts_high)
+
         if(self.callback_mode):
             weights[..., 0]=weights[..., 0]*self.ph
 
 
         ######
         #weights=weights*self.ph was moved to trasngen
+
         return {'input_data': image, 'input_weight': weights}, labels
 
 def CorrectGen(gen,model):

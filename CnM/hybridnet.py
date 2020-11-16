@@ -1,12 +1,24 @@
-from keras.models import Model
-from keras.layers import Input, ZeroPadding2D, concatenate, Lambda, ZeroPadding3D, add
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, ZeroPadding2D, concatenate, Lambda, ZeroPadding3D, add
+from tensorflow.keras.layers  import Dropout, Activation
+from CnM.models import *
+from tensorflow.keras.layers  import UpSampling2D, Conv2D, Conv3D, UpSampling3D, AveragePooling3D
+from tensorflow.keras.layers  import AveragePooling2D, MaxPooling2D, MaxPooling3D
+from tensorflow.keras.layers  import BatchNormalization
+from lib.custom_layers import Scale
+import tensorflow as tf
+''':returns
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, ZeroPadding2D, concatenate, Lambda, ZeroPadding3D, add
 from keras.layers.core import Dropout, Activation
+
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv3D, UpSampling3D, AveragePooling3D
 from keras.layers.pooling import AveragePooling2D, MaxPooling2D, MaxPooling3D
 from keras.layers.normalization import BatchNormalization
 from lib.custom_layers import Scale
 import tensorflow as tf
 
+'''
 
 def conv_block3d(x, stage, branch, nb_filter, dropout_rate=None, weight_decay=1e-4):
     '''Apply BatchNorm, Relu, bottleneck 1x1 Conv3D, 3x3 Conv3D, and option dropout
@@ -425,163 +437,167 @@ def dense_rnn_net(args):
 class argument(object):
 
 
-    def   __init__(self, dim):
-        self.input_size = dim
-        self.input_cols = dim
+    def   __init__(self, input_size):
+        self.input_size_x = input_size[0]
+        self.input_size_y=input_size[1]
+        self.input_cols = input_size[2]
 
 
-def dilated_resnet(input_size):
-    args = argument(input_size[0])
-    inputs = Input(batch_shape = (1, args.input_size, args.input_size, args.input_cols, 1),name='input_data')
-    conv1 = Conv3D(64, (3, 3, 3), padding = "same",kernel_initializer="he_normal")(inputs)
-    bn0 = BatchNormalization()(conv1)
+def dilated_resnet(input_size, mode=True):
+    args = argument(input_size)
+    inputs = Input(batch_shape=(1, args.input_size_x, args.input_size_y, args.input_cols, 1), name='input_data')
+    paddy=SymmetricPadding3D(padding=8)(inputs)
+    conv1 = Conv3D(64, (3, 3, 3), padding="same", kernel_initializer="he_normal")(paddy)
+    bn0 = BatchNormalization(trainable=mode,renorm=True)(conv1)
     ac0 = Activation('relu')(bn0)
-    pool1 = MaxPooling3D(pool_size=(2, 2, 1))(ac0)
+    pool1 = MaxPooling3D(pool_size=(2, 2, 2))(ac0)
 
     #  resudial block
     conv2 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool1)
-    bn1 = BatchNormalization()(conv2)
+    bn1 = BatchNormalization(trainable=mode,renorm=True)(conv2)
     ac1 = Activation('relu')(bn1)
     conv3 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac1)
-    bn2 = BatchNormalization()(conv3)
+    bn2 = BatchNormalization(trainable=mode,renorm=True)(conv3)
     pad1 = Conv3D(128, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool1)
-    BN1 = BatchNormalization()(pad1)
+    BN1 = BatchNormalization(trainable=mode,renorm=True)(pad1)
     sumb1 = add([BN1, bn2])
-    res1  = Activation('relu')(sumb1)
+    res1 = Activation('relu')(sumb1)
 
-    pool2 = MaxPooling3D(pool_size=(2, 2, 1))(res1)
+    pool2 = MaxPooling3D(pool_size=(2, 2, 2))(res1)
 
     #  resudial block
     conv4 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool2)
-    bn3 = BatchNormalization()(conv4)
+    bn3 = BatchNormalization(trainable=mode,renorm=True)(conv4)
     ac2 = Activation('relu')(bn3)
     conv5 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac2)
-    bn4 = BatchNormalization()(conv5)
+    bn4 = BatchNormalization(trainable=mode,renorm=True)(conv5)
     pad2 = Conv3D(256, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool2)
-    BN2 = BatchNormalization()(pad2)
+    BN2 = BatchNormalization(trainable=mode,renorm=True)(pad2)
     sumb2 = add([BN2, bn4])
-    res2  = Activation('relu')(sumb2)
+    res2 = Activation('relu')(sumb2)
 
-
-    pool3 = MaxPooling3D(pool_size=(2, 2, 1))(res2)
+    pool3 = MaxPooling3D(pool_size=(2, 2, 2))(res2)
 
     #  resudial block
     conv6 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool3)
-    bn5 = BatchNormalization()(conv6)
+    bn5 = BatchNormalization(trainable=mode,renorm=True)(conv6)
     ac3 = Activation('relu')(bn5)
     conv7 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac3)
-    bn6 = BatchNormalization()(conv7)
+    bn6 = BatchNormalization(trainable=mode,renorm=True)(conv7)
     pad3 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool3)
-    BN3 = BatchNormalization()(pad3)
+    BN3 = BatchNormalization(trainable=mode,renorm=True)(pad3)
     sumb3 = add([BN3, bn6])
-    res3  = Activation('relu')(sumb3)
+    res3 = Activation('relu')(sumb3)
 
     #  resudial deliated block
     del1 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(res3)
-    delbn1 = BatchNormalization()(del1)
+    delbn1 = BatchNormalization(trainable=mode,renorm=True)(del1)
     delac1 = Activation('relu')(delbn1)
     del2 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(delac1)
-    delbn2 = BatchNormalization()(del2)
+    delbn2 = BatchNormalization(trainable=mode,renorm=True)(del2)
     deladd1 = add([res3, delbn2])
-    delres  = Activation('relu')(deladd1)
+    delres = Activation('relu')(deladd1)
 
-    pool4 = MaxPooling3D(pool_size=(2, 2, 1))(delres)
+    pool4 = MaxPooling3D(pool_size=(2, 2, 2))(delres)
 
     #  resudial block
     conv6_4 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool4)
-    bn5_4 = BatchNormalization()(conv6_4)
+    bn5_4 = BatchNormalization(trainable=mode,renorm=True)(conv6_4)
     ac3_4 = Activation('relu')(bn5_4)
     conv7_4 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac3_4)
-    bn6_4 = BatchNormalization()(conv7_4)
+    bn6_4 = BatchNormalization(trainable=mode,renorm=True)(conv7_4)
     pad3_4 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool4)
-    BN3_4 = BatchNormalization()(pad3_4)
+    BN3_4 = BatchNormalization(trainable=mode,renorm=True)(pad3_4)
     sumb3_4 = add([BN3_4, bn6_4])
-    res3_4  = Activation('relu')(sumb3_4)
+    res3_4 = Activation('relu')(sumb3_4)
 
     #  resudial deliated block
     del3 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(res3_4)
-    delbn3 = BatchNormalization()(del3)
+    delbn3 = BatchNormalization(trainable=mode,renorm=True)(del3)
     delac3 = Activation('relu')(delbn3)
     del4 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(delac3)
-    delbn4 = BatchNormalization()(del4)
+    delbn4 = BatchNormalization(trainable=mode,renorm=True)(del4)
     deladd2 = add([res3_4, delbn4])
-    delres2  = Activation('relu')(deladd2)
+    delres2 = Activation('relu')(deladd2)
 
-
-    up0 = UpSampling3D(size=(2,2,1))(delres2)
+    up0 = UpSampling3D(size=(2, 2, 2))(delres2)
     pad4 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(delres)
-    BN4 = BatchNormalization()(pad4)
+    BN4 = BatchNormalization(trainable=mode,renorm=True)(pad4)
     sumb4 = add([BN4, up0])
 
     #  resudial block
     conv8_1 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb4)
-    bn7_1 = BatchNormalization()(conv8_1)
+    bn7_1 = BatchNormalization(trainable=mode,renorm=True)(conv8_1)
     ac4_1 = Activation('relu')(bn7_1)
     conv9_1 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac4_1)
-    bn8_1 = BatchNormalization()(conv9_1)
+    bn8_1 = BatchNormalization(trainable=mode,renorm=True)(conv9_1)
     pad5_1 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4)
-    BN5_1 = BatchNormalization()(pad5_1)
+    BN5_1 = BatchNormalization(trainable=mode,renorm=True)(pad5_1)
     sumb5_1 = add([BN5_1, bn8_1])
-    res4_1  = Activation('relu')(sumb5_1)
+    res4_1 = Activation('relu')(sumb5_1)
 
     #  resudial deliated block
     del5 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(res4_1)
-    delbn5 = BatchNormalization()(del5)
+    delbn5 = BatchNormalization(trainable=mode,renorm=True)(del5)
     delac5 = Activation('relu')(delbn5)
     del6 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(delac5)
-    delbn6 = BatchNormalization()(del6)
+    delbn6 = BatchNormalization(trainable=mode,renorm=True)(del6)
     deladd3 = add([res4_1, delbn6])
-    delres3  = Activation('relu')(deladd3)
+    delres3 = Activation('relu')(deladd3)
 
-    up0_1 = UpSampling3D(size=(2,2,1))(delres3)
+    up0_1 = UpSampling3D(size=(2, 2, 2))(delres3)
     pad4_1 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res2)
-    BN4_1 = BatchNormalization()(pad4_1)
+    BN4_1 = BatchNormalization(trainable=mode,renorm=True)(pad4_1)
     sumb4_1 = add([BN4_1, up0_1])
 
     #  resudial block
     conv8 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb4_1)
-    bn7 = BatchNormalization()(conv8)
+    bn7 = BatchNormalization(trainable=mode,renorm=True)(conv8)
     ac4 = Activation('relu')(bn7)
     conv9 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac4)
-    bn8 = BatchNormalization()(conv9)
+    bn8 = BatchNormalization(trainable=mode,renorm=True)(conv9)
     pad5 = Conv3D(256, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4_1)
-    BN5 = BatchNormalization()(pad5)
+    BN5 = BatchNormalization(trainable=mode,renorm=True)(pad5)
     sumb5 = add([BN5, bn8])
-    res4  = Activation('relu')(sumb5)
+    res4 = Activation('relu')(sumb5)
 
-    up1 = UpSampling3D(size=(2, 2, 1))(res4)
+    up1 = UpSampling3D(size=(2, 2, 2))(res4)
     pad6 = Conv3D(256, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res1)
     BN6 = BatchNormalization()(pad6)
     sumb6 = add([BN6, up1])
 
     #  resudial block
     conv10 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb6)
-    bn9 = BatchNormalization()(conv10)
+    bn9 = BatchNormalization(trainable=mode,renorm=True)(conv10)
     ac5 = Activation('relu')(bn9)
     conv11 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac5)
-    bn10 = BatchNormalization()(conv11)
+    bn10 = BatchNormalization(trainable=mode,renorm=True)(conv11)
     pad7 = Conv3D(128, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb6)
-    BN7 = BatchNormalization()(pad7)
+    BN7 = BatchNormalization(trainable=mode,renorm=True)(pad7)
     sumb7 = add([BN7, bn10])
-    res5  = Activation('relu')(sumb7)
+    res5 = Activation('relu')(sumb7)
 
-    up2 = UpSampling3D(size=(2, 2, 1))(res5)
+    up2 = UpSampling3D(size=(2, 2, 2))(res5)
     pad8 = Conv3D(128, (1, 1, 1), padding="same", kernel_initializer="he_normal")(ac0)
-    BN8 = BatchNormalization()(pad8)
+    BN8 = BatchNormalization(trainable=mode,renorm=True)(pad8)
     sumb8 = add([BN8, up2])
 
     #  resudial block
     conv12 = Conv3D(64, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb8)
-    bn11= BatchNormalization()(conv12)
+    bn11 = BatchNormalization(trainable=mode,renorm=True)(conv12)
     ac6 = Activation('relu')(bn11)
     conv13 = Conv3D(64, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac6)
-    bn12 = BatchNormalization()(conv13)
+    bn12 = BatchNormalization(trainable=mode,renorm=True)(conv13)
+
+
     pad9 = Conv3D(64, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb8)
-    BN9 = BatchNormalization()(pad9)
+    BN9 = BatchNormalization(trainable=mode,renorm=True)(pad9)
     sumb9 = add([BN9, bn12])
+    sumb9=tf.keras.layers.Cropping3D(
+        cropping=((8, 8), (8, 8), (8, 8)))(sumb9)
     res6 = Activation('relu')(sumb9)
 
-    output3 = Conv3D(1, (1, 1, 1), padding="same", activation='sigmoid',kernel_initializer="he_normal")(res6)
+    output3 = Conv3D(1, (1, 1, 1), padding="same", activation='sigmoid', kernel_initializer="he_normal")(res6)
 
     # print (output3)
     loss = 'binary_crossentropy'
@@ -591,5 +607,570 @@ def dilated_resnet(input_size):
     # opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
     model.compile(optimizer=opt, loss=loss, metrics=['accuracy'])
 
+    return model
+
+def dilated_resnet_nobn(input_size, mode=True):
+    args = argument(input_size)
+    inputs = Input(batch_shape=(1, args.input_size_x, args.input_size_y, args.input_cols, 1), name='input_data')
+    paddy = SymmetricPadding3D(padding=8)(inputs)
+    conv1 = Conv3D(64, (3, 3, 3), padding="same", kernel_initializer="he_normal")(inputs)
+    ac0 = Activation('relu')(conv1)
+    pool1 = MaxPooling3D(pool_size=(2, 2, 2))(ac0)
+
+    #  resudial block
+    conv2 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool1)
+
+    ac1 = Activation('relu')(conv2)
+    conv3 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac1)
+
+    pad1 = Conv3D(128, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool1)
+
+    sumb1 = add([pad1, conv3])
+    res1 = Activation('relu')(sumb1)
+
+    pool2 = MaxPooling3D(pool_size=(2, 2, 2))(res1)
+
+    #  resudial block
+    conv4 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool2)
+
+    ac2 = Activation('relu')(conv4)
+    conv5 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac2)
+
+    pad2 = Conv3D(256, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool2)
+
+    sumb2 = add([pad2, conv5])
+    res2 = Activation('relu')(sumb2)
+
+    pool3 = MaxPooling3D(pool_size=(2, 2, 2))(res2)
+
+    #  resudial block
+    conv6 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool3)
+
+    ac3 = Activation('relu')(conv6)
+    conv7 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac3)
+
+    pad3 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool3)
+
+    sumb3 = add([pad3, conv7])
+    res3 = Activation('relu')(sumb3)
+
+    #  resudial deliated block
+    del1 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(res3)
+
+    delac1 = Activation('relu')(del1)
+    del2 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(delac1)
+
+    deladd1 = add([res3, del2])
+    delres = Activation('relu')(deladd1)
+
+    pool4 = MaxPooling3D(pool_size=(2, 2, 2))(delres)
+
+    #  resudial block
+    conv6_4 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(pool4)
+
+    ac3_4 = Activation('relu')(conv6_4)
+    conv7_4 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac3_4)
+
+    pad3_4 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool4)
+
+    sumb3_4 = add([pad3_4, conv7_4])
+    res3_4 = Activation('relu')(sumb3_4)
+
+    #  resudial deliated block
+    del3 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(res3_4)
+
+    delac3 = Activation('relu')(del3)
+    del4 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(delac3)
+
+    deladd2 = add([res3_4, del4])
+    delres2 = Activation('relu')(deladd2)
+
+    up0 = UpSampling3D(size=(2, 2, 2))(delres2)
+    pad4 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(delres)
+
+    sumb4 = add([pad4, up0])
+
+    #  resudial block
+    conv8_1 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb4)
+
+    ac4_1 = Activation('relu')(conv8_1)
+    conv9_1 = Conv3D(512, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac4_1)
+
+    pad5_1 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4)
+
+    sumb5_1 = add([pad5_1, conv9_1])
+    res4_1 = Activation('relu')(sumb5_1)
+
+    #  resudial deliated block
+    del5 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(res4_1)
+    delbn5 = BatchNormalization(trainable=mode)(del5)
+    delac5 = Activation('relu')(del5)
+    del6 = Conv3D(512, (3, 3, 3), padding="same", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(delac5)
+    delbn6 = BatchNormalization(trainable=mode)(del6)
+    deladd3 = add([res4_1, del6])
+    delres3 = Activation('relu')(deladd3)
+
+    up0_1 = UpSampling3D(size=(2, 2, 2))(delres3)
+    pad4_1 = Conv3D(512, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res2)
+    BN4_1 = BatchNormalization(trainable=mode)(pad4_1)
+    sumb4_1 = add([pad4_1, up0_1])
+
+    #  resudial block
+    conv8 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb4_1)
+
+    ac4 = Activation('relu')(conv8)
+    conv9 = Conv3D(256, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac4)
+
+    pad5 = Conv3D(256, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4_1)
+
+    sumb5 = add([pad5, conv9])
+    res4 = Activation('relu')(sumb5)
+
+    up1 = UpSampling3D(size=(2, 2, 2))(res4)
+    pad6 = Conv3D(256, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res1)
+    BN6 = BatchNormalization()(pad6)
+    sumb6 = add([pad6, up1])
+
+    #  resudial block
+    conv10 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb6)
+
+    ac5 = Activation('relu')(conv10)
+    conv11 = Conv3D(128, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac5)
+
+    pad7 = Conv3D(128, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb6)
+
+    sumb7 = add([pad7, conv11])
+    res5 = Activation('relu')(sumb7)
+
+    up2 = UpSampling3D(size=(2, 2, 2))(res5)
+    pad8 = Conv3D(128, (1, 1, 1), padding="same", kernel_initializer="he_normal")(ac0)
+
+    sumb8 = add([pad8, up2])
+
+    #  resudial block
+    conv12 = Conv3D(64, (3, 3, 3), padding="same", kernel_initializer="he_normal")(sumb8)
+
+    ac6 = Activation('relu')(conv12)
+    conv13 = Conv3D(64, (3, 3, 3), padding="same", kernel_initializer="he_normal")(ac6)
+
+    pad9 = Conv3D(64, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb8)
+
+    sumb9 = add([pad9, conv13])
+    res6 = Activation('relu')(sumb9)
+
+    output3 = Conv3D(1, (1, 1, 1), padding="same", activation='sigmoid', kernel_initializer="he_normal")(res6)
+
+    # print (output3)
+    loss = 'binary_crossentropy'
+    lr = 1e-4
+    model = Model(inputs=inputs, outputs=output3)
+    opt = tf.keras.optimizers.Adam(lr=lr)
+    # opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
+    model.compile(optimizer=opt, loss=loss, metrics=['accuracy'])
 
     return model
+
+def dilated_resnet_pad(input_size,batch_size=1, mode=True,downscale_factor=1):
+    d=downscale_factor
+    args = argument(input_size)
+    inputs = Input(batch_shape=(batch_size, args.input_size_x, args.input_size_y, args.input_cols, 1), name='input_data')
+    paddy = SymmetricPadding3D(padding=1)(inputs)
+    conv1 = Conv3D(64, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy)
+    bn0 = BatchNormalization(trainable=mode, renorm=True)(conv1)
+    ac0 = Activation('relu')(bn0)
+    pool1 = MaxPooling3D(pool_size=(2, 2, 2))(ac0)
+
+    #  resudial block
+    paddy1=SymmetricPadding3D(padding=1)(pool1)
+    conv2 = Conv3D(128//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy1)
+    bn1 = BatchNormalization(trainable=mode, renorm=True)(conv2)
+    ac1 = Activation('relu')(bn1)
+    paddy2 = SymmetricPadding3D(padding=1)(ac1)
+    conv3 = Conv3D(128//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy2)
+    bn2 = BatchNormalization(trainable=mode, renorm=True)(conv3)
+    pad1 = Conv3D(128//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool1)
+    BN1 = BatchNormalization(trainable=mode, renorm=True)(pad1)
+    sumb1 = add([BN1, bn2])
+    res1 = Activation('relu')(sumb1)
+
+    pool2 = MaxPooling3D(pool_size=(2, 2, 2))(res1)
+
+    #  resudial block
+    paddy4 = SymmetricPadding3D(padding=1)(pool2)
+    conv4 = Conv3D(256//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy4)
+    bn3 = BatchNormalization(trainable=mode, renorm=True)(conv4)
+    ac2 = Activation('relu')(bn3)
+    paddy4_1 = SymmetricPadding3D(padding=1)(ac2)
+    conv5 = Conv3D(256//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy4_1)
+    bn4 = BatchNormalization(trainable=mode, renorm=True)(conv5)
+    pad2 = Conv3D(256//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool2)
+    BN2 = BatchNormalization(trainable=mode, renorm=True)(pad2)
+    sumb2 = add([BN2, bn4])
+    res2 = Activation('relu')(sumb2)
+
+    pool3 = MaxPooling3D(pool_size=(2, 2, 2))(res2)
+
+    #  resudial block
+    paddy5 = SymmetricPadding3D(padding=1)(pool3)
+    conv6 = Conv3D(512//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy5)
+    bn5 = BatchNormalization(trainable=mode, renorm=True)(conv6)
+    ac3 = Activation('relu')(bn5)
+    paddy6 = SymmetricPadding3D(padding=1)(ac3)
+    conv7 = Conv3D(512//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy6)
+    bn6 = BatchNormalization(trainable=mode, renorm=True)(conv7)
+    pad3 = Conv3D(512//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool3)
+    BN3 = BatchNormalization(trainable=mode, renorm=True)(pad3)
+    sumb3 = add([BN3, bn6])
+    res3 = Activation('relu')(sumb3)
+
+    #  resudial deliated block
+    paddy7 = SymmetricPadding3D(padding=2)(res3)
+    del1 = Conv3D(512//d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy7)
+    delbn1 = BatchNormalization(trainable=mode, renorm=True)(del1)
+    delac1 = Activation('relu')(delbn1)
+    paddy8 = SymmetricPadding3D(padding=2)(delac1)
+    del2 = Conv3D(512//d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy8)
+    delbn2 = BatchNormalization(trainable=mode, renorm=True)(del2)
+    deladd1 = add([res3, delbn2])
+    delres = Activation('relu')(deladd1)
+
+    pool4 = MaxPooling3D(pool_size=(2, 2, 2))(delres)
+
+    #  resudial block
+    paddy9 = SymmetricPadding3D(padding=1)(pool4)
+    conv6_4 = Conv3D(512//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy9)
+    bn5_4 = BatchNormalization(trainable=mode, renorm=True)(conv6_4)
+    ac3_4 = Activation('relu')(bn5_4)
+    paddy10 = SymmetricPadding3D(padding=1)(ac3_4)
+    conv7_4 = Conv3D(512//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy10)
+    bn6_4 = BatchNormalization(trainable=mode, renorm=True)(conv7_4)
+    pad3_4 = Conv3D(512//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool4)
+    BN3_4 = BatchNormalization(trainable=mode, renorm=True)(pad3_4)
+    sumb3_4 = add([BN3_4, bn6_4])
+    res3_4 = Activation('relu')(sumb3_4)
+
+    #  resudial deliated block
+    paddy11 = SymmetricPadding3D(padding=2)(res3_4)
+    del3 = Conv3D(512//d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy11)
+    delbn3 = BatchNormalization(trainable=mode, renorm=True)(del3)
+    delac3 = Activation('relu')(delbn3)
+    paddy12 = SymmetricPadding3D(padding=2)(delac3)
+    del4 = Conv3D(512//d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy12)
+    delbn4 = BatchNormalization(trainable=mode, renorm=True)(del4)
+    deladd2 = add([res3_4, delbn4])
+    delres2 = Activation('relu')(deladd2)
+
+    up0 = UpSampling3D(size=(2, 2, 2))(delres2)
+    pad4 = Conv3D(512//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(delres)
+    BN4 = BatchNormalization(trainable=mode, renorm=True)(pad4)
+    sumb4 = add([BN4, up0])
+
+    #  resudial block
+    paddy13 = SymmetricPadding3D(padding=1)(sumb4)
+    conv8_1 = Conv3D(512//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy13)
+    bn7_1 = BatchNormalization(trainable=mode, renorm=True)(conv8_1)
+    ac4_1 = Activation('relu')(bn7_1)
+    paddy14 = SymmetricPadding3D(padding=1)(ac4_1)
+    conv9_1 = Conv3D(512//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy14)
+    bn8_1 = BatchNormalization(trainable=mode, renorm=True)(conv9_1)
+    pad5_1 = Conv3D(512//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4)
+    BN5_1 = BatchNormalization(trainable=mode, renorm=True)(pad5_1)
+    sumb5_1 = add([BN5_1, bn8_1])
+    res4_1 = Activation('relu')(sumb5_1)
+
+    #  resudial deliated block
+    paddy15 = SymmetricPadding3D(padding=2)(res4_1)
+    del5 = Conv3D(512//d, (3, 3, 3),padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy15)
+    delbn5 = BatchNormalization(trainable=mode, renorm=True)(del5)
+    delac5 = Activation('relu')(delbn5)
+    paddy16 = SymmetricPadding3D(padding=2)(delac5)
+    del6 = Conv3D(512//d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy16)
+    delbn6 = BatchNormalization(trainable=mode, renorm=True)(del6)
+    deladd3 = add([res4_1, delbn6])
+    delres3 = Activation('relu')(deladd3)
+
+    up0_1 = UpSampling3D(size=(2, 2, 2))(delres3)
+    pad4_1 = Conv3D(512//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res2)
+    BN4_1 = BatchNormalization(trainable=mode, renorm=True)(pad4_1)
+    sumb4_1 = add([BN4_1, up0_1])
+
+    #  resudial block
+    paddy17 = SymmetricPadding3D(padding=1)(sumb4_1)
+    conv8 = Conv3D(256//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy17)
+    bn7 = BatchNormalization(trainable=mode, renorm=True)(conv8)
+    ac4 = Activation('relu')(bn7)
+    paddy18 = SymmetricPadding3D(padding=1)(ac4)
+    conv9 = Conv3D(256//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy18)
+    bn8 = BatchNormalization(trainable=mode, renorm=True)(conv9)
+    pad5 = Conv3D(256//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4_1)
+    BN5 = BatchNormalization(trainable=mode, renorm=True)(pad5)
+    sumb5 = add([BN5, bn8])
+    res4 = Activation('relu')(sumb5)
+
+    up1 = UpSampling3D(size=(2, 2, 2))(res4)
+    pad6 = Conv3D(256//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res1)
+    BN6 = BatchNormalization()(pad6)
+    sumb6 = add([BN6, up1])
+
+    #  resudial block
+    paddy19 = SymmetricPadding3D(padding=1)(sumb6)
+    conv10 = Conv3D(128//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy19)
+    bn9 = BatchNormalization(trainable=mode, renorm=True)(conv10)
+    ac5 = Activation('relu')(bn9)
+    paddy20 = SymmetricPadding3D(padding=1)(ac5)
+    conv11 = Conv3D(128//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy20)
+    bn10 = BatchNormalization(trainable=mode, renorm=True)(conv11)
+    pad7 = Conv3D(128//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb6)
+    BN7 = BatchNormalization(trainable=mode, renorm=True)(pad7)
+    sumb7 = add([BN7, bn10])
+    res5 = Activation('relu')(sumb7)
+
+    up2 = UpSampling3D(size=(2, 2, 2))(res5)
+    pad8 = Conv3D(128//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(ac0)
+    BN8 = BatchNormalization(trainable=mode, renorm=True)(pad8)
+    sumb8 = add([BN8, up2])
+
+    #  resudial block
+    paddy21 = SymmetricPadding3D(padding=1)(sumb8)
+    conv12 = Conv3D(64//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy21)
+    bn11 = BatchNormalization(trainable=mode, renorm=True)(conv12)
+    ac6 = Activation('relu')(bn11)
+    paddy22 = SymmetricPadding3D(padding=1)(ac6)
+    conv13 = Conv3D(64//d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy22)
+    bn12 = BatchNormalization(trainable=mode, renorm=True)(conv13)
+
+    pad9 = Conv3D(64//d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb8)
+    BN9 = BatchNormalization(trainable=mode, renorm=True)(pad9)
+    sumb9 = add([BN9, bn12])
+    res6 = Activation('relu')(sumb9)
+
+    output3 = Conv3D(1, (1, 1, 1), padding="same", activation='sigmoid', kernel_initializer="he_normal")(res6)
+
+    # print (output3)
+    loss = 'binary_crossentropy'
+    lr = 1e-4
+    model = Model(inputs=inputs, outputs=output3)
+    opt = tf.keras.optimizers.Adam(lr=lr)
+    opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
+    model.compile(optimizer=opt, loss=loss, metrics=['accuracy'])
+    return model
+
+def unet3D_pad(input_size, mode=True, downscale_factor=1, batch_size=1):
+    d = downscale_factor
+    args = argument(input_size)
+    inputs = Input(batch_shape=(batch_size, args.input_size_x, args.input_size_y, args.input_cols, 1),
+                   name='input_data')
+    paddy = SymmetricPadding3D(padding=1)(inputs)
+    conv1 = Conv3D(64, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy)
+    bn0 = BatchNormalization(trainable=mode, renorm=True)(conv1)
+    ac0 = Activation('relu')(bn0)
+    pool1 = MaxPooling3D(pool_size=(2, 2, 2))(ac0)
+
+    #  resudial block
+    paddy1 = SymmetricPadding3D(padding=1)(pool1)
+    conv2 = Conv3D(128 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy1)
+    bn1 = BatchNormalization(trainable=mode, renorm=True)(conv2)
+    ac1 = Activation('relu')(bn1)
+    paddy2 = SymmetricPadding3D(padding=1)(ac1)
+    conv3 = Conv3D(128 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy2)
+    bn2 = BatchNormalization(trainable=mode, renorm=True)(conv3)
+    pad1 = Conv3D(128 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool1)
+    BN1 = BatchNormalization(trainable=mode, renorm=True)(pad1)
+    sumb1 = add([BN1, bn2])
+    res1 = Activation('relu')(sumb1)
+
+    pool2 = MaxPooling3D(pool_size=(2, 2, 2))(res1)
+
+    #  resudial block
+    paddy4 = SymmetricPadding3D(padding=1)(pool2)
+    conv4 = Conv3D(256 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy4)
+    bn3 = BatchNormalization(trainable=mode, renorm=True)(conv4)
+    ac2 = Activation('relu')(bn3)
+    paddy4_1 = SymmetricPadding3D(padding=1)(ac2)
+    conv5 = Conv3D(256 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy4_1)
+    bn4 = BatchNormalization(trainable=mode, renorm=True)(conv5)
+    pad2 = Conv3D(256 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool2)
+    BN2 = BatchNormalization(trainable=mode, renorm=True)(pad2)
+    sumb2 = add([BN2, bn4])
+    res2 = Activation('relu')(sumb2)
+
+    pool3 = MaxPooling3D(pool_size=(2, 2, 2))(res2)
+
+    #  resudial block
+    paddy5 = SymmetricPadding3D(padding=1)(pool3)
+    conv6 = Conv3D(512 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy5)
+    bn5 = BatchNormalization(trainable=mode, renorm=True)(conv6)
+    ac3 = Activation('relu')(bn5)
+    paddy6 = SymmetricPadding3D(padding=1)(ac3)
+    conv7 = Conv3D(512 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy6)
+    bn6 = BatchNormalization(trainable=mode, renorm=True)(conv7)
+    pad3 = Conv3D(512 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool3)
+    BN3 = BatchNormalization(trainable=mode, renorm=True)(pad3)
+    sumb3 = add([BN3, bn6])
+    res3 = Activation('relu')(sumb3)
+
+    #  resudial deliated block
+    paddy7 = SymmetricPadding3D(padding=2)(res3)
+    del1 = Conv3D(512 // d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy7)
+    delbn1 = BatchNormalization(trainable=mode, renorm=True)(del1)
+    delac1 = Activation('relu')(delbn1)
+    paddy8 = SymmetricPadding3D(padding=2)(delac1)
+    del2 = Conv3D(512 // d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(paddy8)
+    delbn2 = BatchNormalization(trainable=mode, renorm=True)(del2)
+    deladd1 = add([res3, delbn2])
+    delres = Activation('relu')(deladd1)
+
+    pool4 = MaxPooling3D(pool_size=(2, 2, 2))(delres)
+
+    #  resudial block
+    paddy9 = SymmetricPadding3D(padding=1)(pool4)
+    conv6_4 = Conv3D(1024 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy9)
+    bn5_4 = BatchNormalization(trainable=mode, renorm=True)(conv6_4)
+    ac3_4 = Activation('relu')(bn5_4)
+    paddy10 = SymmetricPadding3D(padding=1)(ac3_4)
+    conv7_4 = Conv3D(1024 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy10)
+    bn6_4 = BatchNormalization(trainable=mode, renorm=True)(conv7_4)
+    pad3_4 = Conv3D(1024 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(pool4)
+    BN3_4 = BatchNormalization(trainable=mode, renorm=True)(pad3_4)
+    sumb3_4 = add([BN3_4, bn6_4])
+    res3_4 = Activation('relu')(sumb3_4)
+
+    #  resudial deliated block
+    paddy11 = SymmetricPadding3D(padding=2)(res3_4)
+    del3 = Conv3D(1024 // d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(
+        paddy11)
+    delbn3 = BatchNormalization(trainable=mode, renorm=True)(del3)
+    delac3 = Activation('relu')(delbn3)
+    paddy12 = SymmetricPadding3D(padding=2)(delac3)
+    del4 = Conv3D(1024 // d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(
+        paddy12)
+    delbn4 = BatchNormalization(trainable=mode, renorm=True)(del4)
+    deladd2 = add([res3_4, delbn4])
+    delres2 = Activation('relu')(deladd2)
+
+    up0 = UpSampling3D(size=(2, 2, 2))(delres2)
+    pad4 = Conv3D(1024 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(delres)
+    BN4 = BatchNormalization(trainable=mode, renorm=True)(pad4)
+    sumb4 = add([BN4, up0])
+
+    #  resudial block
+    paddy13 = SymmetricPadding3D(padding=1)(sumb4)
+    conv8_1 = Conv3D(512 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy13)
+    bn7_1 = BatchNormalization(trainable=mode, renorm=True)(conv8_1)
+    ac4_1 = Activation('relu')(bn7_1)
+    paddy14 = SymmetricPadding3D(padding=1)(ac4_1)
+    conv9_1 = Conv3D(512 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy14)
+    bn8_1 = BatchNormalization(trainable=mode, renorm=True)(conv9_1)
+    pad5_1 = Conv3D(512 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4)
+    BN5_1 = BatchNormalization(trainable=mode, renorm=True)(pad5_1)
+    sumb5_1 = add([BN5_1, bn8_1])
+    res4_1 = Activation('relu')(sumb5_1)
+
+    #  resudial deliated block
+    paddy15 = SymmetricPadding3D(padding=2)(res4_1)
+    del5 = Conv3D(512 // d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(
+        paddy15)
+    delbn5 = BatchNormalization(trainable=mode, renorm=True)(del5)
+    delac5 = Activation('relu')(delbn5)
+    paddy16 = SymmetricPadding3D(padding=2)(delac5)
+    del6 = Conv3D(512 // d, (3, 3, 3), padding="valid", dilation_rate=(2, 2, 2), kernel_initializer="he_normal")(
+        paddy16)
+    delbn6 = BatchNormalization(trainable=mode, renorm=True)(del6)
+    deladd3 = add([res4_1, delbn6])
+    delres3 = Activation('relu')(deladd3)
+    up0_1 = UpSampling3D(size=(2, 2, 2))(delres3)
+    pad4_1 = Conv3D(512 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res2)
+    BN4_1 = BatchNormalization(trainable=mode, renorm=True)(pad4_1)
+    sumb4_1 = add([BN4_1, up0_1])
+
+    #  resudial block
+    paddy17 = SymmetricPadding3D(padding=1)(sumb4_1)
+    conv8 = Conv3D(256 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy17)
+    bn7 = BatchNormalization(trainable=mode, renorm=True)(conv8)
+    ac4 = Activation('relu')(bn7)
+    paddy18 = SymmetricPadding3D(padding=1)(ac4)
+    conv9 = Conv3D(256 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy18)
+    bn8 = BatchNormalization(trainable=mode, renorm=True)(conv9)
+    pad5 = Conv3D(256 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb4_1)
+    BN5 = BatchNormalization(trainable=mode, renorm=True)(pad5)
+    sumb5 = add([BN5, bn8])
+    res4 = Activation('relu')(sumb5)
+
+    up1 = UpSampling3D(size=(2, 2, 2))(res4)
+    pad6 = Conv3D(256 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(res1)
+    BN6 = BatchNormalization(trainable=mode, renorm=True)(pad6)
+    sumb6 = add([BN6, up1])
+
+    #  resudial block
+    paddy19 = SymmetricPadding3D(padding=1)(sumb6)
+    conv10 = Conv3D(128 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy19)
+    bn9 = BatchNormalization(trainable=mode, renorm=True)(conv10)
+    ac5 = Activation('relu')(bn9)
+    paddy20 = SymmetricPadding3D(padding=1)(ac5)
+    conv11 = Conv3D(128 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy20)
+    bn10 = BatchNormalization(trainable=mode, renorm=True)(conv11)
+    pad7 = Conv3D(128 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb6)
+    BN7 = BatchNormalization(trainable=mode, renorm=True)(pad7)
+    sumb7 = add([BN7, bn10])
+    res5 = Activation('relu')(sumb7)
+
+    up2 = UpSampling3D(size=(2, 2, 2))(res5)
+    pad8 = Conv3D(128 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(ac0)
+    BN8 = BatchNormalization(trainable=mode, renorm=True)(pad8)
+    sumb8 = add([BN8, up2])
+
+    #  resudial block
+    paddy21 = SymmetricPadding3D(padding=1)(sumb8)
+    conv12 = Conv3D(64 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy21)
+    bn11 = BatchNormalization(trainable=mode, renorm=True)(conv12)
+    ac6 = Activation('relu')(bn11)
+    paddy22 = SymmetricPadding3D(padding=1)(ac6)
+    conv13 = Conv3D(64 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy22)
+    bn12 = BatchNormalization(trainable=mode, renorm=True)(conv13)
+
+    pad9 = Conv3D(64 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb8)
+    BN9 = BatchNormalization(trainable=mode, renorm=True)(pad9)
+    sumb9 = add([BN9, bn12])
+    res6 = Activation('relu')(sumb9)
+
+    output3 = Conv3D(1, (1, 1, 1), padding="same", activation='sigmoid', kernel_initializer="he_normal")(res6)
+
+    # print (output3)
+    loss = 'binary_crossentropy'
+    lr = 1e-4
+    model = Model(inputs=inputs, outputs=output3)
+    opt = tf.keras.optimizers.Adam(lr=lr)
+    opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
+    model.compile(optimizer=opt, loss=loss, metrics=['accuracy'])
+    return model
+
+def make_conv_layer(in_layer,layers,d=1,dilation_rate=1,norm=True,mode=True, renorm=True):
+    if(norm):
+        in_layer = BatchNormalization(trainable=mode, renorm=renorm)(in_layer)
+    paddy = SymmetricPadding3D(padding=dilation_rate)(in_layer)
+    conv = Conv3D(layers // d, (3, 3, 3),dilation_rate=dilation_rate, padding="valid", kernel_initializer="he_normal")(paddy)
+    ac = Activation('relu')(conv)
+    return ac
+
+
+
+
+'''
+def make_downconv()
+    paddy19 = SymmetricPadding3D(padding=1)(sumb6)
+    conv10 = Conv3D(128 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy19)
+    bn9 = BatchNormalization(trainable=mode, renorm=True)(conv10)
+    ac5 = Activation('relu')(bn9)
+    paddy20 = SymmetricPadding3D(padding=1)(ac5)
+    conv11 = Conv3D(128 // d, (3, 3, 3), padding="valid", kernel_initializer="he_normal")(paddy20)
+    bn10 = BatchNormalization(trainable=mode, renorm=True)(conv11)
+    pad7 = Conv3D(128 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(sumb6)
+    BN7 = BatchNormalization(trainable=mode, renorm=True)(pad7)
+    sumb7 = add([BN7, bn10])
+    res5 = Activation('relu')(sumb7)
+
+    up2 = UpSampling3D(size=(2, 2, 2))(res5)
+    pad8 = Conv3D(128 // d, (1, 1, 1), padding="same", kernel_initializer="he_normal")(ac0)
+    BN8 = BatchNormalization(trainable=mode, renorm=True)(pad8)
+    sumb8 = add([BN8, up2])
+'''

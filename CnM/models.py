@@ -1,9 +1,31 @@
 import tensorflow as tf
-from keras import Input, Model
-from keras.layers import Conv3D, MaxPooling3D, Dropout, UpSampling3D, Concatenate,Layer, BatchNormalization
-from keras.optimizers import Adam
+from tensorflow.keras import Input, Model
+from tensorflow.keras.layers import Conv3D, MaxPooling3D, Dropout, UpSampling3D, Concatenate,Layer, BatchNormalization
+
 import numpy as np
 
+from tensorflow import pad
+from tensorflow.keras.layers import Layer
+from tensorflow.keras import Sequential
+
+'''
+  1D Constant Padding
+  Attributes:
+    - padding: (padding_left, padding_right) tuple
+    - constant: int (default = 0)
+'''
+class SymmetricPadding3D(Layer):
+    def __init__(self, padding=1, constant=0, **kwargs):
+        self.padding = padding
+        self.constant = constant
+        super(SymmetricPadding3D, self).__init__(**kwargs)
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[1] + self.padding + self.padding,input_shape[2] + self.padding + self.padding,input_shape[3] + self.padding + self.padding)
+
+    def call(self, input_tensor, mask=None):
+        padding_side = self.padding
+        return pad(input_tensor,  [[0, 0], [padding_side, padding_side], [padding_side, padding_side], [padding_side, padding_side], [0, 0]], mode='SYMMETRIC')
 
 def unet3D(pretrained_weights=None, input_size=(256, 256, 256, 1), kernelSize=3, outputSize=1, activation='sigmoid',lr=1e-3,
            loss='binary_crossentropy',downscale_factor=1):
@@ -93,7 +115,7 @@ def unet3D(pretrained_weights=None, input_size=(256, 256, 256, 1), kernelSize=3,
     return model
 
 
-def addWeightTo3DModel(model, loss,lr=1e-4):
+def addWeightTo3DModel(model, loss,lr=1e-4,batch_size=1):
     """
     Add additional input layer to model (for inputing custom weights)
 
@@ -105,19 +127,14 @@ def addWeightTo3DModel(model, loss,lr=1e-4):
     input = model.input
     output = model.output
 
-    newInput = Input(batch_shape=(1,model.input_shape[1], model.input_shape[2], model.input_shape[3], model.input_shape[4]),
+    newInput = Input(batch_shape=(batch_size,model.input_shape[1], model.input_shape[2], model.input_shape[3], model.input_shape[4]),
                      name="input_weight")
     numChannels = model.output_shape[-1]
-
-    print("agha")
-    print(input.shape)
-    print(newInput.shape)
-    print(output.shape)
     newOutput = Concatenate(axis=-1)([output, newInput])
 
     newModel = Model(inputs=(input, newInput), outputs=newOutput)
     opt = tf.keras.optimizers.Adam(lr=lr)
-    #opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
+    opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
     newLoss = lambda y_true, y: newLossFun3D(y_true, y, loss, numChannels)
 
     newModel.compile(optimizer=opt, loss=newLoss, metrics=['accuracy'])
@@ -134,8 +151,10 @@ def newLossFun3D(y_true, y, loss, numChannels):
     :return:
     """
     prediction, weights = tf.split(y, [numChannels, 1], axis=-1)
+
     val = tf.expand_dims(loss(y_true, prediction),axis=-1)*weights
-    val=(tf.math.reduce_sum(val))/(tf.math.reduce_sum(weights))
+    #val = tf.math.multiply(loss(y_true, prediction) , weights)
+    val=tf.math.divide(tf.math.reduce_sum(val),(tf.math.reduce_sum(weights)))
     return val
 
 
@@ -324,3 +343,56 @@ def SymmetricPaddingunet3D(pretrained_weights=None, input_size=(256, 256, 256, 1
 def UNetRoundDimension(num,depth=4):
     bas=2.0**4
     return int(np.ceil(num/bas)*bas)
+
+def fuse_models(model_1,model_2,loss=tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE),lr=1e-4):
+
+
+    input_1 = model_1.input
+
+
+
+    model_1.trainable = False
+    model_1.output=model_1.layers[-2].output
+    output_1 = model_1(input_1)
+    output_2 = model_2(input_1).layers[-2].output
+
+
+    newOutput = Concatenate(axis=-1)([output_1, output_2])
+    output=Conv3D(1,(1,1,1), padding='same', activation='sigmoid',kernel_initializer="he_normal")(newOutput)
+    newModel = Model(inputs=input_1, outputs=output)
+    print(model_1.layers)
+    opt = tf.keras.optimizers.Adam(lr=lr)
+
+    newModel.compile(optimizer=opt, loss=loss, metrics=['accuracy'])
+    return newModel
+
+
+def addWeightTo3DModel(model, loss,lr=1e-4,batch_size=1):
+    """
+    Add additional input layer to model (for inputing custom weights)
+
+    these weights are important to emphazise border regions inbetween particles
+    :param model:
+    :param loss:
+    :return:
+    """
+    input = model.input
+    output = model.output
+
+    newInput = Input(batch_shape=(batch_size,model.input_shape[1], model.input_shape[2], model.input_shape[3], model.input_shape[4]),
+                     name="input_weight")
+    numChannels = model.output_shape[-1]
+
+    print("agha")
+    print(input.shape)
+    print(newInput.shape)
+    print(output.shape)
+    newOutput = Concatenate(axis=-1)([output, newInput])
+
+    newModel = Model(inputs=(input, newInput), outputs=newOutput)
+    opt = tf.keras.optimizers.Adam(lr=lr)
+    opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
+    newLoss = lambda y_true, y: newLossFun3D(y_true, y, loss, numChannels)
+
+    newModel.compile(optimizer=opt, loss=newLoss, metrics=['accuracy'])
+    return newModel

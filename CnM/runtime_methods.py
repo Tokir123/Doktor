@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from CnM.generators import *
 import os
 import copy
+
 def OneHotEncoding(image):
 
     uq = np.unique(image)
@@ -38,19 +39,16 @@ def   MakeLabel(label_folder='training_data/labels',full_image_size=(1008, 1204,
         label=np.array(Image.open(label_folder+'/'+file))
         if len(label.shape)==3:
             label=label[...,0]
-        print(label.shape)
-        print(np.mean(label))
         slice=int(file.split('.')[0])-1
         label=OneHotEncoding(label)[...,1]
-        print(np.mean(label))
-        ph[...,slice,:]=label[...,np.newaxis]
 
-    print(ph.shape)
-    print(np.unique(ph))
-    print(np.mean(ph))
+
+        ph[...,slice,0]=label
+
+
     return ph
 
-def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 1204, 101)):
+def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 1204, 101),difficulty=1):
     '''
     :param label_folder:
     :param full_image_size:
@@ -64,9 +62,9 @@ def   MakeWeight(label_folder='training_data/weights',full_image_size=(1008, 120
         slice=int(file.split('.')[0])-1
         weight=weight/14
 
-        weight=weight*weight+0.2
-
-        ph[...,slice,0]=weight
+        #weight=weight*weight+0.2
+        weight = weight
+        ph[...,slice,0]=weight**difficulty+0.2
 
 
 
@@ -197,6 +195,43 @@ def Apply(function,model, data, input_size, padding=(0, 0, 0)):
     return output
 
 
+
+def Apply_model(function, data, input_size, padding=(0, 0, 0)):
+    #data_shape=.,.,.
+    step_size = np.array(input_size) - 2 * np.array(padding)
+   #Assume data is of shape(batch_size,...)
+
+
+
+    f = function
+    dim = data.shape[1:4]
+
+
+    output = np.zeros((1,)+dim)
+    i = 0
+    j = 0
+    k = 0
+    while True:
+        if (i > (dim[0] - input_size[0])):
+            i = 0
+            j += step_size[1]
+            print(j)
+            if (j > (dim[1] - input_size[1])):
+                j = 0
+                k += step_size[2]
+                if (k > (dim[2] - input_size[2])):
+                    break  # brich ab
+
+        else:
+            if(np.mean(data[:,i:i + input_size[0], j:j + input_size[1], k:k + input_size[2]])!=0,0):
+                output[0,i + padding[0]:i - padding[0] + input_size[0], j + padding[1]:j - padding[1] + input_size[1],
+                    k + padding[2]:k - padding[2] + input_size[2]] =f(data[:,i:i + input_size[0], j:j + input_size[1], k:k + input_size[2],:])[0,
+                    padding[0]:input_size[0] - padding[0], padding[1]:input_size[1] - padding[1],
+                    padding[2]:input_size[2] - padding[2],0]
+
+        i += step_size[0]
+
+    return output
 
 
 def TTA3D(image, model, transformations):
@@ -396,3 +431,114 @@ def average_pictures(image_stack,required_ratio=0.5):
     output=output*120
     return output.astype(np.uint8)
 
+#### THIS BELOW IS ALL DUPLICATE FROM RUNTIMEMETHODS
+class Transformation3D:
+    def __init__(self):
+        """
+        Abstract class for bijective image coordinate system transformations
+        """
+        return
+
+    def transform(self, image):
+        """
+        Transform coordinate system of image
+        :param image:
+        """
+        pass
+
+    def inverseTransform(self, image):
+        """
+        Inverse transform of coordinate system of image
+        :param image:
+        """
+        pass
+
+
+class Mirror3D(Transformation3D):
+
+    def __init__(self, axis):
+        """
+        Transformation for mirroring image axis
+        :param axis:
+        """
+        self.axis = axis
+
+    def transform(self, image):
+        out = np.flip(image, axis=self.axis)
+        return out
+
+    def inverseTransform(self, image):
+        return self.transform(image)
+
+
+class Rotation3D(Transformation3D):
+
+    def __init__(self, axis, k):
+        """
+        Transformation for rotating image around axis by k*90 degrees
+        :param axis:
+        :param k:
+        """
+        self.axis = axis
+        self.k = k
+
+    def transform(self, image):
+        return rot90(image, k=self.k, axis=self.axis)
+
+    def inverseTransform(self, image):
+        return rot90(image, k=4 - self.k, axis=self.axis)
+
+
+class Identity3D(Transformation3D):
+    def __init__(self):
+        """
+        Identity transformation
+        """
+        super().__init__()
+        return
+
+    def transform(self, image):
+        return image
+
+    def inverseTransform(self, image):
+        return self.transform(image)
+
+
+class ConcetenateTrafo3D(Transformation3D):
+
+    def __init__(self, trafo1, trafo2):
+        """
+        Concetenate the image transformations trafo1 and trafo2
+        :param trafo1:
+        :param trafo2:
+        """
+        self.trafo1 = trafo1
+        self.trafo2 = trafo2
+
+    def transform(self, image):
+        out = self.trafo1.transform(image)
+        out = self.trafo2.transform(out)
+        return out
+
+    def inverseTransform(self, image):
+        out = self.trafo2.inverseTransform(image)
+        out = self.trafo1.inverseTransform(out)
+        return out
+
+
+def getConcetenateTrafo(trafos):
+    """
+    Concetenation of list of Transformation 3D objects
+    :param trafos: list of Transformation3D objects
+    :return: Transformation3D object which is the concettenated trafo of trafos
+    """
+    trafo = Identity3D()
+    for i in range(len(trafos)):
+        trafo = ConcetenateTrafo3D(trafo, trafos[i])
+    return trafo
+def rot90(m, k=1, axis=2):
+    """Rotate an array k*90 degrees in the counter-clockwise direction around the given axis"""
+    m = np.swapaxes(m, 2, axis)
+    m = np.rot90(m, k)
+    m = np.swapaxes(m, 2, axis)
+    return m
